@@ -1,4 +1,14 @@
 import { api } from './api';
+import {
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+  clearTokens,
+  hasAccessToken,
+} from './tokens';
+
+// Re-export token utilities for convenience
+export { getAccessToken, getRefreshToken, clearTokens, hasAccessToken };
 
 // Types matching API responses
 export interface User {
@@ -19,49 +29,18 @@ export interface AuthResponse {
   tokens: AuthTokens;
 }
 
-// Token storage keys
-const ACCESS_TOKEN_KEY = 'accessToken';
-const REFRESH_TOKEN_KEY = 'refreshToken';
-
 /**
- * Store tokens in localStorage
+ * Store tokens in localStorage (wrapper for convenience)
  */
 export function storeTokens(tokens: AuthTokens): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-}
-
-/**
- * Clear tokens from localStorage
- */
-export function clearTokens(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-}
-
-/**
- * Get stored access token
- */
-export function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
-}
-
-/**
- * Get stored refresh token
- */
-export function getRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  setTokens(tokens.accessToken, tokens.refreshToken);
 }
 
 /**
  * Check if user is authenticated (has access token)
  */
 export function isAuthenticated(): boolean {
-  return getAccessToken() !== null;
+  return hasAccessToken();
 }
 
 /**

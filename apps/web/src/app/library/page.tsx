@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { SearchBar, MovieGrid } from '@/components/library';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, clearTokens } from '@/lib/auth';
+import { AuthExpiredError } from '@/lib/api';
 import {
   searchMovies,
   getPopularMovies,
@@ -69,6 +70,12 @@ export default function LibraryPage() {
         setHasMore(result.hasMore);
         setPage(pageNum);
       } catch (err) {
+        // Handle auth expiry - redirect to login
+        if (err instanceof AuthExpiredError) {
+          clearTokens();
+          router.push('/login?redirect=/library');
+          return;
+        }
         const message =
           err instanceof Error ? err.message : 'Failed to load movies';
         setError(message);
@@ -77,7 +84,7 @@ export default function LibraryPage() {
         setIsLoadingMore(false);
       }
     },
-    [],
+    [router],
   );
 
   // Initial load

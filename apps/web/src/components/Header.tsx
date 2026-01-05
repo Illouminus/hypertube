@@ -32,7 +32,7 @@ export function Header() {
   const handleLogout = async () => {
     await logout();
     setUser(null);
-    router.refresh();
+    router.push('/login');
   };
 
   const isActive = (path: string) => pathname === path;

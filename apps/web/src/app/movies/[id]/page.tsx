@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { MovieDetails, CommentsSection } from '@/components/movies';
 import { Spinner } from '@/components/ui';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, clearTokens } from '@/lib/auth';
+import { AuthExpiredError } from '@/lib/api';
 import { getMovieById, type MovieDetails as MovieDetailsType } from '@/lib/movies';
 import styles from './page.module.css';
 
@@ -45,6 +46,12 @@ export default function MoviePage({ params }: MoviePageProps) {
         const data = await getMovieById(id);
         setMovie(data);
       } catch (err) {
+        // Handle auth expiry - redirect to login
+        if (err instanceof AuthExpiredError) {
+          clearTokens();
+          router.push(`/login?redirect=/movies/${id}`);
+          return;
+        }
         setError(err instanceof Error ? err.message : 'Failed to load movie');
       } finally {
         setIsLoading(false);
@@ -52,7 +59,7 @@ export default function MoviePage({ params }: MoviePageProps) {
     };
 
     fetchMovie();
-  }, [id, isAuthed]);
+  }, [id, isAuthed, router]);
 
   // Show nothing while checking auth
   if (!authChecked) {

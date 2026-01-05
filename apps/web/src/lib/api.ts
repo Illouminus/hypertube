@@ -1,4 +1,5 @@
 import { config } from '@/config/env';
+import { getAccessToken, getRefreshToken, setTokens, clearTokens } from './tokens';
 
 // API error response type
 export interface ApiError {
@@ -33,24 +34,105 @@ export class ApiRequestError extends Error {
   }
 }
 
-// Generic fetch wrapper
-export async function apiFetch<T>(
-  endpoint: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const url = `${config.apiUrl}${endpoint}`;
+// Custom error for expired authentication (refresh failed)
+export class AuthExpiredError extends Error {
+  constructor(message = 'Session expired. Please sign in again.') {
+    super(message);
+    this.name = 'AuthExpiredError';
+  }
+}
 
+// Endpoints that should NOT trigger refresh-retry on 401
+// (they handle auth themselves or are the refresh endpoint)
+const NO_REFRESH_ENDPOINTS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/auth/logout',
+];
+
+/**
+ * Check if endpoint should skip refresh-retry logic on 401
+ */
+function shouldSkipRefresh(endpoint: string): boolean {
+  return NO_REFRESH_ENDPOINTS.some(
+    (path) => endpoint === path || endpoint.startsWith(`${path}?`)
+  );
+}
+
+// Shared refresh promise to prevent refresh storms
+let refreshPromise: Promise<string> | null = null;
+
+/**
+ * Attempt to refresh tokens. Uses a shared promise so concurrent
+ * 401 responses only trigger one refresh request.
+ * Returns the new access token on success.
+ */
+async function doRefreshTokens(): Promise<string> {
+  // If a refresh is already in progress, wait for it
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    clearTokens();
+    throw new AuthExpiredError('No refresh token available');
+  }
+
+  // Create the refresh promise
+  refreshPromise = (async () => {
+    try {
+      const url = `${config.apiUrl}/auth/refresh`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+
+      if (!response.ok) {
+        clearTokens();
+        throw new AuthExpiredError('Failed to refresh session');
+      }
+
+      // API returns { accessToken, refreshToken }
+      const newAccessToken = data.accessToken;
+      const newRefreshToken = data.refreshToken;
+
+      if (!newAccessToken || !newRefreshToken) {
+        clearTokens();
+        throw new AuthExpiredError('Invalid refresh response');
+      }
+
+      setTokens(newAccessToken, newRefreshToken);
+      return newAccessToken;
+    } finally {
+      // Clear the shared promise so future refreshes can happen
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+/**
+ * Execute a fetch request with the given access token
+ */
+async function executeRequest<T>(
+  url: string,
+  options: RequestInit,
+  accessToken: string | null,
+): Promise<{ response: Response; data: unknown }> {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
 
-  // Add auth token if available
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-    }
+  if (accessToken) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
   }
 
   const response = await fetch(url, {
@@ -58,9 +140,48 @@ export async function apiFetch<T>(
     headers,
   });
 
-  // Handle empty responses (e.g., 204 No Content)
   const text = await response.text();
   const data = text ? JSON.parse(text) : {};
+
+  return { response, data };
+}
+
+// Generic fetch wrapper with automatic token refresh
+export async function apiFetch<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  _isRetry = false,
+): Promise<T> {
+  const url = `${config.apiUrl}${endpoint}`;
+  const accessToken = getAccessToken();
+
+  const { response, data } = await executeRequest<T>(url, options, accessToken);
+
+  // Handle 401 Unauthorized - attempt token refresh (only once)
+  if (response.status === 401 && !_isRetry) {
+    // Skip refresh for specific auth endpoints (login, register, refresh, logout)
+    // Note: /auth/me SHOULD trigger refresh since it's a protected endpoint
+    if (shouldSkipRefresh(endpoint)) {
+      // Don't try to refresh for these endpoints - just throw the error
+      if (isApiError(data)) {
+        throw new ApiRequestError(data);
+      }
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    try {
+      // Attempt to refresh tokens
+      await doRefreshTokens();
+      // Retry the original request with the new token (mark as retry to prevent loops)
+      return apiFetch<T>(endpoint, options, true);
+    } catch (err) {
+      // Refresh failed - throw AuthExpiredError
+      if (err instanceof AuthExpiredError) {
+        throw err;
+      }
+      throw new AuthExpiredError('Session expired. Please sign in again.');
+    }
+  }
 
   if (!response.ok) {
     if (isApiError(data)) {

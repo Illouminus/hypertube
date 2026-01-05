@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   listComments,
   createComment,
   deleteComment,
   type CommentItem as CommentItemType,
 } from '@/lib/comments';
+import { AuthExpiredError } from '@/lib/api';
+import { clearTokens } from '@/lib/auth';
 import { CommentItem } from './CommentItem';
 import { CommentForm } from './CommentForm';
 import { Spinner } from '@/components/ui';
@@ -17,6 +20,7 @@ interface CommentsSectionProps {
 }
 
 export function CommentsSection({ movieId }: CommentsSectionProps) {
+  const router = useRouter();
   const [comments, setComments] = useState<CommentItemType[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -27,6 +31,12 @@ export function CommentsSection({ movieId }: CommentsSectionProps) {
   const [error, setError] = useState<string | null>(null);
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Handle auth expired error
+  const handleAuthExpired = useCallback(() => {
+    clearTokens();
+    router.push(`/login?redirect=/movies/${movieId}`);
+  }, [router, movieId]);
 
   // Fetch comments
   const fetchComments = useCallback(
@@ -50,13 +60,17 @@ export function CommentsSection({ movieId }: CommentsSectionProps) {
         setHasMore(result.hasMore);
         setPage(pageNum);
       } catch (err) {
+        if (err instanceof AuthExpiredError) {
+          handleAuthExpired();
+          return;
+        }
         setError(err instanceof Error ? err.message : 'Failed to load comments');
       } finally {
         setIsLoading(false);
         setIsLoadingMore(false);
       }
     },
-    [movieId],
+    [movieId, handleAuthExpired],
   );
 
   // Initial load
@@ -96,6 +110,12 @@ export function CommentsSection({ movieId }: CommentsSectionProps) {
       const newComment = await createComment(movieId, body);
       // Prepend the new comment to the list
       setComments((prev) => [newComment, ...prev]);
+    } catch (err) {
+      if (err instanceof AuthExpiredError) {
+        handleAuthExpired();
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Failed to post comment');
     } finally {
       setIsSubmitting(false);
     }
@@ -108,6 +128,10 @@ export function CommentsSection({ movieId }: CommentsSectionProps) {
       await deleteComment(id);
       setComments((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
+      if (err instanceof AuthExpiredError) {
+        handleAuthExpired();
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to delete comment');
     } finally {
       setDeletingId(null);
