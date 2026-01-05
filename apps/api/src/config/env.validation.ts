@@ -31,4 +31,9 @@ export const envValidationSchema = Joi.object({
   FRONTEND_URL: Joi.string()
     .default('http://localhost:3000')
     .description('Frontend URL for email links'),
+
+  // OMDb API
+  OMDB_API_KEY: Joi.string()
+    .default('')
+    .description('OMDb API key for movie metadata enrichment'),
 });

@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { isAuthenticated, getCurrentUser, logout, User } from '@/lib/auth';
 import styles from './Header.module.css';
 
 export function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,6 +35,8 @@ export function Header() {
     router.refresh();
   };
 
+  const isActive = (path: string) => pathname === path;
+
   return (
     <header className={styles.header}>
       <Link href="/" className={styles.logo}>
@@ -45,6 +48,12 @@ export function Header() {
           <span className={styles.loading}>...</span>
         ) : user ? (
           <div className={styles.userSection}>
+            <Link
+              href="/library"
+              className={`${styles.navLink} ${isActive('/library') ? styles.navLinkActive : ''}`}
+            >
+              Library
+            </Link>
             <span className={styles.username}>Hello, {user.username}</span>
             <button onClick={handleLogout} className={styles.logoutButton}>
               Logout

@@ -1,0 +1,2 @@
+export { SearchMoviesDto } from './search-movies.dto';
+export { PopularMoviesDto } from './popular-movies.dto';

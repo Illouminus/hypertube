@@ -51,3 +51,15 @@ model PasswordResetToken {
   @@index([userId])
   @@index([tokenHash])
 }
+
+// OMDb metadata cache for movies
+model MovieMetadataCache {
+  id        String   @id @default(cuid())
+  cacheKey  String   @unique // normalizedTitle+year OR imdbId
+  data      Json     // Cached OMDb response data
+  fetchedAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([cacheKey])
+  @@index([expiresAt])
+}

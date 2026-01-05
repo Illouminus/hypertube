@@ -90,3 +90,23 @@
 .registerButton:hover {
   background-color: #d63853;
 }
+
+.navLink {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.navLink:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.navLinkActive {
+  color: #e94560;
+  background: rgba(233, 69, 96, 0.1);
+}

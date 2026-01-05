@@ -1,0 +1,138 @@
+{
+  "name": "Public Domain Classics",
+  "description": "Classic public domain films",
+  "movies": [
+    {
+      "id": "pd-night-living-dead",
+      "title": "Night of the Living Dead",
+      "year": 1968,
+      "imdbId": "tt0063350",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE1&dn=Night+of+the+Living+Dead+1968",
+      "seeders": 150,
+      "leechers": 12,
+      "size": "1.4 GB",
+      "language": "English"
+    },
+    {
+      "id": "pd-nosferatu",
+      "title": "Nosferatu",
+      "year": 1922,
+      "imdbId": "tt0013442",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE2&dn=Nosferatu+1922",
+      "seeders": 89,
+      "leechers": 5,
+      "size": "980 MB",
+      "language": "German"
+    },
+    {
+      "id": "pd-metropolis",
+      "title": "Metropolis",
+      "year": 1927,
+      "imdbId": "tt0017136",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE3&dn=Metropolis+1927",
+      "seeders": 234,
+      "leechers": 18,
+      "size": "2.1 GB",
+      "language": "German"
+    },
+    {
+      "id": "pd-cabinet-caligari",
+      "title": "The Cabinet of Dr. Caligari",
+      "year": 1920,
+      "imdbId": "tt0010323",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE4&dn=Cabinet+of+Dr+Caligari+1920",
+      "seeders": 67,
+      "leechers": 3,
+      "size": "750 MB",
+      "language": "German"
+    },
+    {
+      "id": "pd-phantom-opera",
+      "title": "The Phantom of the Opera",
+      "year": 1925,
+      "imdbId": "tt0016220",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE5&dn=Phantom+of+the+Opera+1925",
+      "seeders": 112,
+      "leechers": 8,
+      "size": "1.2 GB",
+      "language": "English"
+    },
+    {
+      "id": "pd-his-girl-friday",
+      "title": "His Girl Friday",
+      "year": 1940,
+      "imdbId": "tt0032599",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE6&dn=His+Girl+Friday+1940",
+      "seeders": 45,
+      "leechers": 2,
+      "size": "890 MB",
+      "language": "English"
+    },
+    {
+      "id": "pd-little-shop-horrors",
+      "title": "The Little Shop of Horrors",
+      "year": 1960,
+      "imdbId": "tt0054033",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE7&dn=Little+Shop+of+Horrors+1960",
+      "seeders": 78,
+      "leechers": 6,
+      "size": "650 MB",
+      "language": "English"
+    },
+    {
+      "id": "pd-plan-9",
+      "title": "Plan 9 from Outer Space",
+      "year": 1957,
+      "imdbId": "tt0052077",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE8&dn=Plan+9+from+Outer+Space+1957",
+      "seeders": 56,
+      "leechers": 4,
+      "size": "720 MB",
+      "language": "English"
+    },
+    {
+      "id": "pd-charade",
+      "title": "Charade",
+      "year": 1963,
+      "imdbId": "tt0056923",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE9&dn=Charade+1963",
+      "seeders": 134,
+      "leechers": 11,
+      "size": "1.5 GB",
+      "language": "English"
+    },
+    {
+      "id": "pd-detour",
+      "title": "Detour",
+      "year": 1945,
+      "imdbId": "tt0037638",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE10&dn=Detour+1945",
+      "seeders": 34,
+      "leechers": 1,
+      "size": "520 MB",
+      "language": "English"
+    },
+    {
+      "id": "pd-carnival-souls",
+      "title": "Carnival of Souls",
+      "year": 1962,
+      "imdbId": "tt0055830",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE11&dn=Carnival+of+Souls+1962",
+      "seeders": 89,
+      "leechers": 7,
+      "size": "780 MB",
+      "language": "English"
+    },
+    {
+      "id": "pd-39-steps",
+      "title": "The 39 Steps",
+      "year": 1935,
+      "imdbId": "tt0026029",
+      "magnet": "magnet:?xt=urn:btih:EXAMPLE12&dn=39+Steps+1935",
+      "seeders": 98,
+      "leechers": 5,
+      "size": "850 MB",
+      "language": "English"
+    }
+  ]
+}
