@@ -1,0 +1,92 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: rgba(26, 26, 46, 0.9);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #e94560;
+  text-decoration: none;
+}
+
+.logo:hover {
+  opacity: 0.9;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loading {
+  color: #a0a0a0;
+}
+
+.userSection {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.username {
+  color: #a0a0a0;
+  font-size: 0.875rem;
+}
+
+.logoutButton {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #e94560;
+  background-color: transparent;
+  color: #e94560;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logoutButton:hover {
+  background-color: rgba(233, 69, 96, 0.1);
+}
+
+.authLinks {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.link {
+  color: #a0a0a0;
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: color 0.2s;
+}
+
+.link:hover {
+  color: white;
+}
+
+.registerButton {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  background-color: #e94560;
+  color: white;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.registerButton:hover {
+  background-color: #d63853;
+}

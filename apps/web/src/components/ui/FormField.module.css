@@ -1,0 +1,15 @@
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.875rem;
+  color: #a0a0a0;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: #666;
+}

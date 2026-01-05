@@ -1,0 +1,17 @@
+.error {
+  padding: 0.875rem;
+  border-radius: 8px;
+  background-color: rgba(233, 69, 96, 0.1);
+  border: 1px solid #e94560;
+  color: #e94560;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.errorItem {
+  margin: 0;
+}
+
+.errorItem + .errorItem {
+  margin-top: 0.25rem;
+}
