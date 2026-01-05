@@ -1,3 +1,9 @@
+.cardLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
 .card {
   position: relative;
   display: flex;
@@ -10,7 +16,7 @@
   cursor: pointer;
 }
 
-.card:hover {
+.cardLink:hover .card {
   transform: translateY(-4px);
   border-color: rgba(233, 69, 96, 0.4);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);

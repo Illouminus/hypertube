@@ -14,7 +14,6 @@ interface MovieGridProps {
   error: string | null;
   onLoadMore: () => void;
   onRetry: () => void;
-  onMovieClick?: (movie: MovieListItem) => void;
 }
 
 export function MovieGrid({
@@ -25,7 +24,6 @@ export function MovieGrid({
   error,
   onLoadMore,
   onRetry,
-  onMovieClick,
 }: MovieGridProps) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -90,7 +88,7 @@ export function MovieGrid({
     <div className={styles.container}>
       <div className={styles.grid}>
         {movies.map((movie) => (
-          <MovieCard key={movie.id} movie={movie} onClick={onMovieClick} />
+          <MovieCard key={movie.id} movie={movie} />
         ))}
       </div>
 

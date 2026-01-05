@@ -117,11 +117,6 @@ export default function LibraryPage() {
     fetchMovies(page, searchQuery, movies.length > 0);
   }, [fetchMovies, page, searchQuery, movies.length]);
 
-  const handleMovieClick = useCallback((movie: MovieListItem) => {
-    // For now, just log - can expand to movie detail page later
-    console.log('Movie clicked:', movie);
-  }, []);
-
   // Show nothing while checking auth
   if (!authChecked) {
     return null;
@@ -180,7 +175,6 @@ export default function LibraryPage() {
             error={error}
             onLoadMore={handleLoadMore}
             onRetry={handleRetry}
-            onMovieClick={handleMovieClick}
           />
         </div>
       </main>

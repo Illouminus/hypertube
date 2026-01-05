@@ -1,6 +1,24 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { AuthLayout, AuthCard, LoginForm } from '@/components/auth';
+import { isAuthenticated } from '@/lib/auth';
 
 export default function LoginPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      router.replace('/library');
+    }
+  }, [router]);
+
+  // Don't render form if authenticated (will redirect)
+  if (typeof window !== 'undefined' && isAuthenticated()) {
+    return null;
+  }
+
   return (
     <AuthLayout>
       <AuthCard
