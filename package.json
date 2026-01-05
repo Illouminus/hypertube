@@ -1,0 +1,35 @@
+{
+  "name": "hypertube",
+  "version": "0.0.1",
+  "description": "Hypertube - Movie streaming platform",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm install --prefix apps/api && npm install --prefix apps/web",
+    "dev:api": "npm run start:dev --prefix apps/api",
+    "dev:web": "npm run dev --prefix apps/web",
+    "build:api": "npm run build --prefix apps/api",
+    "build:web": "npm run build --prefix apps/web",
+    "build:all": "npm run build:api && npm run build:web",
+    "lint:api": "npm run lint --prefix apps/api",
+    "lint:web": "npm run lint --prefix apps/web",
+    "lint:all": "npm run lint:api && npm run lint:web",
+    "typecheck:api": "npm run typecheck --prefix apps/api",
+    "typecheck:web": "npm run typecheck --prefix apps/web",
+    "typecheck:all": "npm run typecheck:api && npm run typecheck:web",
+    "test:api": "npm run test --prefix apps/api",
+    "prisma:generate": "npm run prisma:generate --prefix apps/api",
+    "prisma:migrate": "npm run prisma:migrate --prefix apps/api",
+    "prisma:studio": "npm run prisma:studio --prefix apps/api",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
