@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { FortyTwoOAuthService } from './fortytwo-oauth.service';
+import { GoogleOAuthService } from './google-oauth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { MailModule } from '../mail/mail.module';
@@ -16,7 +17,7 @@ import { MailModule } from '../mail/mail.module';
     MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, FortyTwoOAuthService, JwtStrategy],
+  providers: [AuthService, FortyTwoOAuthService, GoogleOAuthService, JwtStrategy],
   exports: [AuthService],
 })
 export class AuthModule { }

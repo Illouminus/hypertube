@@ -51,6 +51,12 @@
   letter-spacing: 0.05em;
 }
 
+.oauthButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .oauthButton {
   display: flex;
   align-items: center;
@@ -78,7 +84,31 @@
   transform: translateY(0);
 }
 
+.oauthButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .oauthLogo {
   font-size: 1.25rem;
   font-weight: bold;
+}
+
+/* Google button variant */
+.googleButton {
+  background: #ffffff;
+  color: #333333;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.googleButton:hover {
+  background: #f8f8f8;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.googleIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }

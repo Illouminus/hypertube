@@ -15,6 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { AuthService, AuthResponse, AuthTokens } from './auth.service';
 import { FortyTwoOAuthService } from './fortytwo-oauth.service';
+import { GoogleOAuthService } from './google-oauth.service';
 import {
   RegisterDto,
   LoginDto,
@@ -35,6 +36,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly fortyTwoOAuthService: FortyTwoOAuthService,
+    private readonly googleOAuthService: GoogleOAuthService,
     private readonly configService: ConfigService,
   ) {
     this.frontendUrl = this.configService.get<string>(
@@ -209,9 +211,89 @@ export class AuthController {
     }
   }
 
+  // ============ Google OAuth Endpoints ============
+
+  /**
+   * Initiate Google OAuth flow
+   * GET /auth/google
+   * Redirects to Google consent page
+   */
+  @Public()
+  @Get('google')
+  async initiateGoogleOAuth(@Res() res: Response): Promise<void> {
+    const { url } = this.googleOAuthService.generateAuthUrl();
+    this.logger.log('Redirecting to Google OAuth');
+    res.redirect(url);
+  }
+
+  /**
+   * Handle Google OAuth callback
+   * GET /auth/google/callback
+   * Exchanges code for tokens and redirects to frontend
+   */
+  @Public()
+  @Get('google/callback')
+  async handleGoogleCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Query('error') error: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const errorRedirect = `${this.frontendUrl}/login?error=`;
+
+    // Handle OAuth errors
+    if (error) {
+      this.logger.warn(`Google OAuth error: ${error}`);
+      res.redirect(`${errorRedirect}${encodeURIComponent('Authentication was cancelled')}`);
+      return;
+    }
+
+    // Validate required parameters
+    if (!code || !state) {
+      this.logger.warn('Missing code or state in Google callback');
+      res.redirect(`${errorRedirect}${encodeURIComponent('Invalid OAuth response')}`);
+      return;
+    }
+
+    // Validate state
+    if (!this.googleOAuthService.validateState(state)) {
+      this.logger.warn('Invalid state in Google callback');
+      res.redirect(`${errorRedirect}${encodeURIComponent('Invalid OAuth state')}`);
+      return;
+    }
+
+    try {
+      // Exchange code for Google access token
+      const accessToken = await this.googleOAuthService.exchangeCodeForToken(code);
+
+      // Get user profile from Google
+      const profile = await this.googleOAuthService.getUserProfile(accessToken);
+
+      // Find or create local user
+      const user = await this.googleOAuthService.findOrCreateUser(profile);
+
+      // Generate our JWT tokens
+      const tokens = await this.authService.generateTokensForUser(user);
+
+      // Store refresh token
+      await this.authService.storeRefreshTokenForUser(user.id, tokens.refreshToken);
+
+      // Create one-time exchange code for frontend
+      const exchangeCode = await this.googleOAuthService.createExchangeCode(user.id);
+
+      // Redirect to frontend with exchange code
+      this.logger.log(`Google OAuth successful for user: ${user.email}`);
+      res.redirect(`${this.frontendUrl}/auth/callback?code=${exchangeCode}`);
+    } catch (err) {
+      this.logger.error('Google OAuth callback error:', err);
+      res.redirect(`${errorRedirect}${encodeURIComponent('Authentication failed')}`);
+    }
+  }
+
   /**
    * Exchange OAuth code for JWT tokens
    * POST /auth/exchange
+   * Works for both 42 and Google OAuth (shared OAuthExchangeCode model)
    */
   @Public()
   @Post('exchange')
@@ -219,8 +301,19 @@ export class AuthController {
   async exchangeCode(@Body() dto: ExchangeCodeDto): Promise<AuthTokens> {
     const { code } = dto;
 
-    // Consume exchange code and get user ID
-    const userId = await this.fortyTwoOAuthService.consumeExchangeCode(code);
+    // Try to consume exchange code (works for any OAuth provider)
+    // Both services use the same OAuthExchangeCode model
+    let userId: string | null = null;
+
+    try {
+      userId = await this.fortyTwoOAuthService.consumeExchangeCode(code);
+    } catch {
+      // Not found in 42 service, might be empty DB result - that's fine
+    }
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid or expired exchange code');
+    }
 
     // Get user
     const user = await this.authService.getCurrentUser(userId);
