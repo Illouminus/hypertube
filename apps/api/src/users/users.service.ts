@@ -1,9 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { UpdateProfileDto } from './dto';
 
 // User data returned to clients (excludes sensitive fields)
 export type SafeUser = Omit<User, 'passwordHash' | 'refreshTokenHash'>;
+
+// Public user profile (excludes email and other sensitive data)
+export type PublicUser = Pick<
+  User,
+  'id' | 'username' | 'firstName' | 'lastName' | 'avatarUrl' | 'language' | 'createdAt'
+>;
 
 @Injectable()
 export class UsersService {
@@ -69,13 +76,61 @@ export class UsersService {
     email: string;
     username: string;
     passwordHash: string;
+    firstName: string;
+    lastName: string;
   }): Promise<User> {
     return this.prisma.user.create({
       data: {
         email: data.email.toLowerCase(),
         username: data.username,
         passwordHash: data.passwordHash,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        language: 'en', // Default language
       },
+    });
+  }
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<User> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Check email uniqueness if changing
+    if (dto.email && dto.email.toLowerCase() !== user.email) {
+      const existingEmail = await this.findByEmail(dto.email);
+      if (existingEmail) {
+        throw new ConflictException('Email is already in use');
+      }
+    }
+
+    // Check username uniqueness if changing
+    if (dto.username && dto.username.toLowerCase() !== user.username.toLowerCase()) {
+      const existingUsername = await this.findByUsername(dto.username);
+      if (existingUsername) {
+        throw new ConflictException('Username is already taken');
+      }
+    }
+
+    // Build update data (only include provided fields)
+    const updateData: Partial<User> = {};
+    if (dto.email !== undefined) updateData.email = dto.email.toLowerCase();
+    if (dto.username !== undefined) updateData.username = dto.username;
+    if (dto.firstName !== undefined) updateData.firstName = dto.firstName;
+    if (dto.lastName !== undefined) updateData.lastName = dto.lastName;
+    if (dto.language !== undefined) updateData.language = dto.language;
+    if (dto.avatarUrl !== undefined) updateData.avatarUrl = dto.avatarUrl;
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
     });
   }
 
@@ -128,5 +183,20 @@ export class UsersService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, refreshTokenHash, ...safeUser } = user;
     return safeUser;
+  }
+
+  /**
+   * Convert user to public profile (no email, no sensitive data)
+   */
+  toPublicUser(user: User): PublicUser {
+    return {
+      id: user.id,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatarUrl: user.avatarUrl,
+      language: user.language,
+      createdAt: user.createdAt,
+    };
   }
 }

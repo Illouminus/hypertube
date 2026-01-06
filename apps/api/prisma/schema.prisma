@@ -26,6 +26,10 @@ model User {
   username         String   @unique
   passwordHash     String
   refreshTokenHash String?  // Hashed refresh token for validation
+  firstName        String   @default("")
+  lastName         String   @default("")
+  language         String   @default("en") // Preferred language (ISO 639-1 code)
+  avatarUrl        String?  // URL to profile picture
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

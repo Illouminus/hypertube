@@ -121,7 +121,7 @@ async function doRefreshTokens(): Promise<string> {
 /**
  * Execute a fetch request with the given access token
  */
-async function executeRequest<T>(
+async function executeRequest(
   url: string,
   options: RequestInit,
   accessToken: string | null,
@@ -155,7 +155,7 @@ export async function apiFetch<T>(
   const url = `${config.apiUrl}${endpoint}`;
   const accessToken = getAccessToken();
 
-  const { response, data } = await executeRequest<T>(url, options, accessToken);
+  const { response, data } = await executeRequest(url, options, accessToken);
 
   // Handle 401 Unauthorized - attempt token refresh (only once)
   if (response.status === 401 && !_isRetry) {
@@ -209,6 +209,13 @@ export const api = {
     apiFetch<T>(endpoint, {
       ...options,
       method: 'PUT',
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+
+  patch: <T>(endpoint: string, body?: unknown, options?: RequestInit) =>
+    apiFetch<T>(endpoint, {
+      ...options,
+      method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
     }),
 

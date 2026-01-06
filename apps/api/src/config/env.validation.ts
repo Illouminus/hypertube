@@ -32,6 +32,23 @@ export const envValidationSchema = Joi.object({
     .default('http://localhost:3000')
     .description('Frontend URL for email links'),
 
+  // SMTP Configuration (optional - falls back to console logging if not set)
+  SMTP_HOST: Joi.string()
+    .default('')
+    .description('SMTP server hostname (e.g., smtp.gmail.com)'),
+  SMTP_PORT: Joi.number()
+    .default(587)
+    .description('SMTP server port (587 for TLS, 465 for SSL)'),
+  SMTP_USER: Joi.string()
+    .default('')
+    .description('SMTP authentication username'),
+  SMTP_PASS: Joi.string()
+    .default('')
+    .description('SMTP authentication password'),
+  SMTP_FROM: Joi.string()
+    .default('noreply@hypertube.local')
+    .description('Default "From" email address'),
+
   // OMDb API
   OMDB_API_KEY: Joi.string()
     .default('')

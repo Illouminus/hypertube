@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { CommentItem as CommentItemType } from '@/lib/comments';
 import styles from './CommentItem.module.css';
 
@@ -33,11 +34,15 @@ export function CommentItem({ comment, onDelete, isDeleting }: CommentItemProps)
 
   return (
     <div className={styles.item}>
-      <div className={styles.avatar}>{getInitial(comment.user.username)}</div>
+      <Link href={`/users/${comment.user.id}`} className={styles.avatarLink}>
+        <div className={styles.avatar}>{getInitial(comment.user.username)}</div>
+      </Link>
       <div className={styles.content}>
         <div className={styles.header}>
           <div className={styles.headerLeft}>
-            <span className={styles.username}>{comment.user.username}</span>
+            <Link href={`/users/${comment.user.id}`} className={styles.usernameLink}>
+              {comment.user.username}
+            </Link>
             {comment.isOwner && (
               <span className={styles.ownerBadge}>You</span>
             )}

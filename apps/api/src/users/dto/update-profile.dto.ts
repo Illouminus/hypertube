@@ -1,46 +1,55 @@
 import {
   IsEmail,
-  IsNotEmpty,
+  IsOptional,
   IsString,
+  IsUrl,
   Matches,
   MaxLength,
   MinLength,
+  IsIn,
 } from 'class-validator';
 
-export class RegisterDto {
-  @IsEmail({}, { message: 'Please provide a valid email address' })
-  @IsNotEmpty()
-  email!: string;
+// Supported languages (ISO 639-1 codes)
+export const SUPPORTED_LANGUAGES = ['en', 'fr', 'es', 'de', 'ru'] as const;
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
+export class UpdateProfileDto {
+  @IsOptional()
+  @IsEmail({}, { message: 'Please provide a valid email address' })
+  email?: string;
+
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MinLength(3, { message: 'Username must be at least 3 characters long' })
   @MaxLength(30, { message: 'Username must not exceed 30 characters' })
   @Matches(/^[a-zA-Z0-9_-]+$/, {
     message:
       'Username can only contain letters, numbers, underscores, and hyphens',
   })
-  username!: string;
+  username?: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'First name is required' })
   @MinLength(1, { message: 'First name must be at least 1 character long' })
   @MaxLength(50, { message: 'First name must not exceed 50 characters' })
-  firstName!: string;
+  firstName?: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Last name is required' })
   @MinLength(1, { message: 'Last name must be at least 1 character long' })
   @MaxLength(50, { message: 'Last name must not exceed 50 characters' })
-  lastName!: string;
+  lastName?: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
-  @MaxLength(128, { message: 'Password must not exceed 128 characters' })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message:
-      'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+  @IsIn(SUPPORTED_LANGUAGES, {
+    message: `Language must be one of: ${SUPPORTED_LANGUAGES.join(', ')}`,
   })
-  password!: string;
+  language?: SupportedLanguage;
+
+  @IsOptional()
+  @IsString()
+  @IsUrl({}, { message: 'Avatar URL must be a valid URL' })
+  @MaxLength(500, { message: 'Avatar URL must not exceed 500 characters' })
+  avatarUrl?: string | null;
 }

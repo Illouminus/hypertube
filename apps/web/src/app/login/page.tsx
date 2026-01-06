@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { AuthLayout, AuthCard, LoginForm } from '@/components/auth';
+import { AuthLayoutWithSuspense, AuthCard, LoginForm } from '@/components/auth';
 import { isAuthenticated } from '@/lib/auth';
 
 export default function LoginPage() {
@@ -20,7 +20,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayoutWithSuspense>
       <AuthCard
         title="Sign In"
         subtitle="Welcome back to Hypertube"
@@ -39,6 +39,6 @@ export default function LoginPage() {
       >
         <LoginForm />
       </AuthCard>
-    </AuthLayout>
+    </AuthLayoutWithSuspense>
   );
 }

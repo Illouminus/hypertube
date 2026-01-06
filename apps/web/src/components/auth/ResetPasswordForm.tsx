@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { resetPassword } from '@/lib/auth';
 import { ApiRequestError } from '@/lib/api';
@@ -10,6 +10,7 @@ import { AuthCard, AuthSuccess } from './AuthCard';
 import styles from './AuthForm.module.css';
 
 export function ResetPasswordForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
@@ -71,6 +72,10 @@ export function ResetPasswordForm() {
     try {
       await resetPassword(token, newPassword);
       setSuccess(true);
+      // Redirect to login after 2 seconds
+      setTimeout(() => {
+        router.push('/login?reset=success');
+      }, 2000);
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setErrors(err.messages);

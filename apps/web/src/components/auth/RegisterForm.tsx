@@ -11,6 +11,8 @@ export function RegisterForm() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
@@ -22,6 +24,14 @@ export function RegisterForm() {
 
     // Client-side validation
     const validationErrors: string[] = [];
+
+    if (!firstName.trim()) {
+      validationErrors.push('First name is required');
+    }
+
+    if (!lastName.trim()) {
+      validationErrors.push('Last name is required');
+    }
 
     if (password !== confirmPassword) {
       validationErrors.push('Passwords do not match');
@@ -43,7 +53,13 @@ export function RegisterForm() {
     setIsLoading(true);
 
     try {
-      await register(email, username, password);
+      await register({
+        email,
+        username,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        password,
+      });
       router.push('/');
     } catch (err) {
       if (err instanceof ApiRequestError) {
@@ -59,6 +75,34 @@ export function RegisterForm() {
   return (
     <form onSubmit={handleSubmit} className={styles.form}>
       {errors.length > 0 && <FormError errors={errors} />}
+
+      <div className={styles.row}>
+        <FormField label="First Name" htmlFor="firstName">
+          <Input
+            id="firstName"
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            placeholder="John"
+            required
+            disabled={isLoading}
+            maxLength={50}
+          />
+        </FormField>
+
+        <FormField label="Last Name" htmlFor="lastName">
+          <Input
+            id="lastName"
+            type="text"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            placeholder="Doe"
+            required
+            disabled={isLoading}
+            maxLength={50}
+          />
+        </FormField>
+      </div>
 
       <FormField label="Email" htmlFor="email">
         <Input

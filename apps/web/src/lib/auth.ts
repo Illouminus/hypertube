@@ -10,13 +10,40 @@ import {
 // Re-export token utilities for convenience
 export { getAccessToken, getRefreshToken, clearTokens, hasAccessToken };
 
+// Supported languages
+export const SUPPORTED_LANGUAGES = ['en', 'fr', 'es', 'de', 'ru'] as const;
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
+
+export const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
+  en: 'English',
+  fr: 'Français',
+  es: 'Español',
+  de: 'Deutsch',
+  ru: 'Русский',
+};
+
 // Types matching API responses
 export interface User {
   id: string;
   email: string;
   username: string;
+  firstName: string;
+  lastName: string;
+  language: SupportedLanguage;
+  avatarUrl: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// Public user profile (no email)
+export interface PublicUser {
+  id: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+  language: string;
+  createdAt: string;
 }
 
 export interface AuthTokens {
@@ -27,6 +54,23 @@ export interface AuthTokens {
 export interface AuthResponse {
   user: User;
   tokens: AuthTokens;
+}
+
+export interface RegisterData {
+  email: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+}
+
+export interface UpdateProfileData {
+  email?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  language?: SupportedLanguage;
+  avatarUrl?: string | null;
 }
 
 /**
@@ -46,16 +90,8 @@ export function isAuthenticated(): boolean {
 /**
  * Register a new user
  */
-export async function register(
-  email: string,
-  username: string,
-  password: string,
-): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>('/auth/register', {
-    email,
-    username,
-    password,
-  });
+export async function register(data: RegisterData): Promise<AuthResponse> {
+  const response = await api.post<AuthResponse>('/auth/register', data);
   storeTokens(response.tokens);
   return response;
 }
@@ -125,6 +161,27 @@ export async function resetPassword(
   newPassword: string,
 ): Promise<void> {
   await api.post('/auth/reset-password', { token, newPassword });
+}
+
+/**
+ * Get current user's profile
+ */
+export async function getProfile(): Promise<User> {
+  return api.get<User>('/users/me');
+}
+
+/**
+ * Update current user's profile
+ */
+export async function updateProfile(data: UpdateProfileData): Promise<User> {
+  return api.patch<User>('/users/me', data);
+}
+
+/**
+ * Get public user profile by ID
+ */
+export async function getPublicProfile(userId: string): Promise<PublicUser> {
+  return api.get<PublicUser>(`/users/${userId}`);
 }
 
 /**

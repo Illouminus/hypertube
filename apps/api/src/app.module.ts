@@ -7,6 +7,7 @@ import { envValidationSchema } from './config/env.validation';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { MoviesModule } from './movies/movies.module';
 import { CommentsModule } from './comments/comments.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -35,6 +36,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     PrismaModule,
     HealthModule,
     AuthModule,
+    UsersModule,
     MoviesModule,
     CommentsModule,
   ],

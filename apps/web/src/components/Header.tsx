@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { isAuthenticated, getCurrentUser, logout, User } from '@/lib/auth';
@@ -12,21 +12,39 @@ export function Header() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const loadUser = useCallback(async () => {
+    if (isAuthenticated()) {
+      try {
+        const currentUser = await getCurrentUser();
+        setUser(currentUser);
+      } catch {
+        // Token invalid or expired
+        setUser(null);
+      }
+    } else {
+      setUser(null);
+    }
+  }, []);
+
   useEffect(() => {
     const checkAuth = async () => {
-      if (isAuthenticated()) {
-        try {
-          const currentUser = await getCurrentUser();
-          setUser(currentUser);
-        } catch {
-          // Token invalid or expired
-          setUser(null);
-        }
-      }
+      await loadUser();
       setLoading(false);
     };
 
     checkAuth();
+  }, [loadUser]);
+
+  // Listen for profile updates
+  useEffect(() => {
+    const handleProfileUpdate = (event: CustomEvent<User>) => {
+      setUser(event.detail);
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate as EventListener);
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate as EventListener);
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -54,7 +72,12 @@ export function Header() {
             >
               Library
             </Link>
-            <span className={styles.username}>Hello, {user.username}</span>
+            <Link
+              href="/profile"
+              className={`${styles.navLink} ${isActive('/profile') ? styles.navLinkActive : ''}`}
+            >
+              {user.username}
+            </Link>
             <button onClick={handleLogout} className={styles.logoutButton}>
               Logout
             </button>

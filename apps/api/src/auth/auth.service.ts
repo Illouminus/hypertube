@@ -73,7 +73,7 @@ export class AuthService {
    * Register a new user
    */
   async register(dto: RegisterDto): Promise<AuthResponse> {
-    const { email, username, password } = dto;
+    const { email, username, password, firstName, lastName } = dto;
 
     // Check for existing email
     if (await this.usersService.isEmailTaken(email)) {
@@ -93,6 +93,8 @@ export class AuthService {
       email,
       username,
       passwordHash,
+      firstName,
+      lastName,
     });
 
     // Generate tokens

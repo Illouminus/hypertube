@@ -11,6 +11,11 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.avatarLink {
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
 .avatar {
   flex-shrink: 0;
   display: flex;
@@ -23,6 +28,12 @@
   color: #ffffff;
   background: linear-gradient(135deg, #e94560 0%, #c73e54 100%);
   border-radius: 50%;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.avatarLink:hover .avatar {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.3);
 }
 
 .content {
@@ -42,6 +53,18 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.usernameLink {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.usernameLink:hover {
+  color: #e94560;
 }
 
 .username {
