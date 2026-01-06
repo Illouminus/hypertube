@@ -164,6 +164,14 @@ export async function resetPassword(
 }
 
 /**
+ * Exchange OAuth code for JWT tokens
+ */
+export async function exchangeOAuthCode(code: string): Promise<void> {
+  const tokens = await api.post<AuthTokens>('/auth/exchange', { code });
+  storeTokens(tokens);
+}
+
+/**
  * Get current user's profile
  */
 export async function getProfile(): Promise<User> {

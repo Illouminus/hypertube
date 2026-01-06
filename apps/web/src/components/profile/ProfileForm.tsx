@@ -121,7 +121,7 @@ export function ProfileForm({ onProfileUpdate }: ProfileFormProps) {
       const updatedUser = await updateProfile(updateData);
       setUser(updatedUser);
       setSuccessMessage('Profile updated successfully!');
-      
+
       // Notify parent component (e.g., to update header)
       if (onProfileUpdate) {
         onProfileUpdate(updatedUser);
@@ -175,128 +175,141 @@ export function ProfileForm({ onProfileUpdate }: ProfileFormProps) {
         <p className={styles.subtitle}>Manage your account information</p>
       </div>
 
-      <form onSubmit={handleSubmit} className={styles.form}>
-        {errors.length > 0 && <FormError errors={errors} />}
-        {successMessage && (
-          <div className={styles.successMessage}>{successMessage}</div>
-        )}
+      <div className={styles.card}>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          {errors.length > 0 && <FormError errors={errors} />}
+          {successMessage && (
+            <div className={styles.successMessage}>{successMessage}</div>
+          )}
 
-        {/* Avatar Section */}
-        <div className={styles.avatarSection}>
-          <div className={styles.avatarPreview}>
-            {avatarUrl && isValidUrl(avatarUrl) ? (
-              <Image
-                src={avatarUrl}
-                alt="Avatar"
-                className={styles.avatarImage}
-                width={80}
-                height={80}
-                unoptimized
-              />
-            ) : (
-              getInitial()
-            )}
+          {/* Avatar Section */}
+          <div className={styles.section}>
+            <h2 className={styles.sectionTitle}>Profile Photo</h2>
+            <div className={styles.avatarSection}>
+              <div className={styles.avatarPreview}>
+                {avatarUrl && isValidUrl(avatarUrl) ? (
+                  <Image
+                    src={avatarUrl}
+                    alt="Avatar"
+                    className={styles.avatarImage}
+                    width={80}
+                    height={80}
+                    unoptimized
+                  />
+                ) : (
+                  getInitial()
+                )}
+              </div>
+              <div className={styles.avatarInput}>
+                <FormField
+                  label="Avatar URL"
+                  htmlFor="avatarUrl"
+                  hint="Enter a URL to an image"
+                >
+                  <Input
+                    id="avatarUrl"
+                    type="url"
+                    value={avatarUrl}
+                    onChange={(e) => setAvatarUrl(e.target.value)}
+                    placeholder="https://example.com/avatar.jpg"
+                    disabled={isSaving}
+                  />
+                </FormField>
+              </div>
+            </div>
           </div>
-          <div className={styles.avatarInput}>
-            <FormField
-              label="Avatar URL"
-              htmlFor="avatarUrl"
-              hint="Enter a URL to an image"
-            >
+
+          {/* Personal Info Section */}
+          <div className={styles.section}>
+            <h2 className={styles.sectionTitle}>Personal Information</h2>
+            <div className={styles.row}>
+              <FormField label="First Name" htmlFor="firstName">
+                <Input
+                  id="firstName"
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="John"
+                  required
+                  disabled={isSaving}
+                  maxLength={50}
+                />
+              </FormField>
+
+              <FormField label="Last Name" htmlFor="lastName">
+                <Input
+                  id="lastName"
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Doe"
+                  required
+                  disabled={isSaving}
+                  maxLength={50}
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* Account Section */}
+          <div className={styles.section}>
+            <h2 className={styles.sectionTitle}>Account</h2>
+            <FormField label="Email" htmlFor="email">
               <Input
-                id="avatarUrl"
-                type="url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://example.com/avatar.jpg"
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
                 disabled={isSaving}
               />
             </FormField>
+
+            <FormField
+              label="Username"
+              htmlFor="username"
+              hint="3-30 characters, letters, numbers, underscores, hyphens"
+            >
+              <Input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="username"
+                required
+                disabled={isSaving}
+                minLength={3}
+                maxLength={30}
+              />
+            </FormField>
           </div>
-        </div>
 
-        {/* Name Row */}
-        <div className={styles.row}>
-          <FormField label="First Name" htmlFor="firstName">
-            <Input
-              id="firstName"
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder="John"
-              required
-              disabled={isSaving}
-              maxLength={50}
-            />
-          </FormField>
+          {/* Preferences Section */}
+          <div className={styles.section}>
+            <h2 className={styles.sectionTitle}>Preferences</h2>
+            <FormField label="Preferred Language" htmlFor="language">
+              <select
+                id="language"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
+                className={styles.languageSelect}
+                disabled={isSaving}
+              >
+                {SUPPORTED_LANGUAGES.map((lang) => (
+                  <option key={lang} value={lang}>
+                    {LANGUAGE_LABELS[lang]}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          </div>
 
-          <FormField label="Last Name" htmlFor="lastName">
-            <Input
-              id="lastName"
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder="Doe"
-              required
-              disabled={isSaving}
-              maxLength={50}
-            />
-          </FormField>
-        </div>
-
-        {/* Email */}
-        <FormField label="Email" htmlFor="email">
-          <Input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="your@email.com"
-            required
-            disabled={isSaving}
-          />
-        </FormField>
-
-        {/* Username */}
-        <FormField
-          label="Username"
-          htmlFor="username"
-          hint="3-30 characters, letters, numbers, underscores, hyphens"
-        >
-          <Input
-            id="username"
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="username"
-            required
-            disabled={isSaving}
-            minLength={3}
-            maxLength={30}
-          />
-        </FormField>
-
-        {/* Language */}
-        <FormField label="Preferred Language" htmlFor="language">
-          <select
-            id="language"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
-            className={styles.languageSelect}
-            disabled={isSaving}
-          >
-            {SUPPORTED_LANGUAGES.map((lang) => (
-              <option key={lang} value={lang}>
-                {LANGUAGE_LABELS[lang]}
-              </option>
-            ))}
-          </select>
-        </FormField>
-
-        <Button type="submit" isLoading={isSaving} className={styles.submitButton}>
-          {isSaving ? 'Saving...' : 'Save Changes'}
-        </Button>
-      </form>
+          <Button type="submit" isLoading={isSaving} className={styles.submitButton}>
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }

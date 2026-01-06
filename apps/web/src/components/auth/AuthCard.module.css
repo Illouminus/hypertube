@@ -85,3 +85,25 @@
   font-size: 0.875rem;
   margin-bottom: 2rem;
 }
+
+/* Invalid token state */
+.invalidLinkContainer {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.primaryButton {
+  display: inline-block;
+  padding: 1rem 2rem;
+  background-color: #e94560;
+  border-radius: 8px;
+  color: white;
+  text-decoration: none;
+  font-weight: bold;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.primaryButton:hover {
+  background-color: #d13d55;
+  transform: translateY(-1px);
+}

@@ -8,6 +8,7 @@ import { ApiRequestError } from '@/lib/api';
 import { Button, Input, FormError, FormField } from '@/components/ui';
 import { AuthCard, AuthSuccess } from './AuthCard';
 import styles from './AuthForm.module.css';
+import cardStyles from './AuthCard.module.css';
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -27,19 +28,8 @@ export function ResetPasswordForm() {
         title="Invalid Link"
         subtitle="This password reset link is invalid or has expired."
       >
-        <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <Link
-            href="/forgot-password"
-            style={{
-              display: 'inline-block',
-              padding: '1rem 2rem',
-              backgroundColor: '#e94560',
-              borderRadius: '8px',
-              color: 'white',
-              textDecoration: 'none',
-              fontWeight: 'bold',
-            }}
-          >
+        <div className={cardStyles.invalidLinkContainer}>
+          <Link href="/forgot-password" className={cardStyles.primaryButton}>
             Request New Link
           </Link>
         </div>

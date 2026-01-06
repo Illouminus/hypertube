@@ -123,6 +123,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Check if user has password (OAuth users don't)
+    if (!user.passwordHash) {
+      throw new UnauthorizedException(
+        'This account uses OAuth login. Please sign in with your OAuth provider.',
+      );
+    }
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
@@ -303,6 +310,29 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
     return this.usersService.toSafeUser(user);
+  }
+
+  // ============ OAuth Helper Methods (Public) ============
+
+  /**
+   * Generate tokens for OAuth user (public wrapper)
+   */
+  async generateTokensForUser(user: {
+    id: string;
+    email: string;
+    username: string;
+  }): Promise<AuthTokens> {
+    return this.generateTokens(user.id, user.email, user.username);
+  }
+
+  /**
+   * Store refresh token for OAuth user (public wrapper)
+   */
+  async storeRefreshTokenForUser(
+    userId: string,
+    refreshToken: string,
+  ): Promise<void> {
+    return this.storeRefreshToken(userId, refreshToken);
   }
 
   // ============ Private Helper Methods ============

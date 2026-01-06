@@ -24,12 +24,17 @@ model User {
   id               String   @id @default(cuid())
   email            String   @unique
   username         String   @unique
-  passwordHash     String
+  passwordHash     String?  // Optional for OAuth users
   refreshTokenHash String?  // Hashed refresh token for validation
   firstName        String   @default("")
   lastName         String   @default("")
   language         String   @default("en") // Preferred language (ISO 639-1 code)
   avatarUrl        String?  // URL to profile picture
+  
+  // OAuth fields
+  oauthProvider    String?  // e.g., "42", "google"
+  oauthProviderId  String?  // User ID from OAuth provider
+  
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -37,8 +42,22 @@ model User {
   passwordResetTokens PasswordResetToken[]
   comments            Comment[]
 
+  @@unique([oauthProvider, oauthProviderId])
   @@index([email])
   @@index([username])
+}
+
+// OAuth exchange codes for secure token exchange (one-time use, short TTL)
+model OAuthExchangeCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String    @unique // Hashed for security
+  expiresAt DateTime
+  usedAt    DateTime? // Null if not yet used
+  createdAt DateTime  @default(now())
+
+  @@index([codeHash])
+  @@index([expiresAt])
 }
 
 // Password reset tokens for forgot password flow

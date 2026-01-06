@@ -1,0 +1,62 @@
+.container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 3rem;
+    background: rgba(26, 26, 46, 0.8);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: center;
+    max-width: 400px;
+}
+
+.errorIcon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #e94560;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+}
+
+.title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #ffffff;
+    margin: 0;
+}
+
+.message {
+    color: #a0a0a0;
+    font-size: 1rem;
+    margin: 0;
+}
+
+.button {
+    display: inline-block;
+    padding: 0.875rem 2rem;
+    background-color: #e94560;
+    border-radius: 8px;
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+.button:hover {
+    background-color: #d13d55;
+    transform: translateY(-1px);
+}
