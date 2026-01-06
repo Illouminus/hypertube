@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { exchangeOAuthCode } from '@/lib/auth';
 import { ApiRequestError } from '@/lib/api';
 import { Spinner } from '@/components/ui';
 import styles from './page.module.css';
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [error, setError] = useState<string | null>(null);
@@ -66,5 +66,22 @@ export default function AuthCallbackPage() {
                 <p className={styles.message}>Completing sign in...</p>
             </div>
         </div>
+    );
+}
+
+export default function AuthCallbackPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className={styles.container}>
+                    <div className={styles.card}>
+                        <Spinner />
+                        <p className={styles.message}>Loading...</p>
+                    </div>
+                </div>
+            }
+        >
+            <AuthCallbackContent />
+        </Suspense>
     );
 }

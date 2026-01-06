@@ -41,6 +41,7 @@ model User {
   // Relations
   passwordResetTokens PasswordResetToken[]
   comments            Comment[]
+  watchedMovies       WatchedMovie[]
 
   @@unique([oauthProvider, oauthProviderId])
   @@index([email])
@@ -102,4 +103,20 @@ model Comment {
 
   @@index([movieId, createdAt])
   @@index([userId, createdAt])
+}
+
+// Watched movies tracking (per user)
+model WatchedMovie {
+  id        String   @id @default(cuid())
+  userId    String
+  movieId   String   // Stable internal movie ID (base64url encoded)
+  watchedAt DateTime @default(now())
+  progress  Int?     // Optional: playback position in seconds
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@index([userId])
+  @@index([movieId])
 }

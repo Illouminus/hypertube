@@ -14,6 +14,8 @@ export interface ProviderMovieHit {
   leechers?: number;
   size?: string;
   language?: string;
+  coverUrl?: string; // Provider's own cover image
+  quality?: string; // Best available quality (e.g., "1080p")
 }
 
 // OMDb enrichment data
@@ -37,6 +39,7 @@ export interface MovieListItem {
   imdbRating?: string;
   genre?: string;
   providers: string[]; // Which providers have this movie
+  isWatched?: boolean; // Whether the current user has watched this movie
 }
 
 // Detailed movie (returned by /movies/:id)
@@ -53,6 +56,8 @@ export interface MovieSource {
   provider: string;
   externalId: string;
   magnet?: string;
+  torrentUrl?: string; // Direct .torrent file URL (for Archive.org)
+  quality?: string; // Video quality (720p, 1080p, etc.)
   seeders?: number;
   leechers?: number;
   size?: string;

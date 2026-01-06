@@ -1,7 +1,7 @@
 import { Injectable, Inject, Logger, NotFoundException } from '@nestjs/common';
-import { createHash } from 'crypto';
 import { MovieProvider, MOVIE_PROVIDERS } from './providers';
-import { OmdbService } from './omdb';
+import { MetadataService } from './metadata';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   MovieListItem,
   MovieDetails,
@@ -17,7 +17,8 @@ export class MoviesService {
   constructor(
     @Inject(MOVIE_PROVIDERS)
     private readonly providers: MovieProvider[],
-    private readonly omdbService: OmdbService,
+    private readonly metadataService: MetadataService,
+    private readonly prisma: PrismaService,
   ) {
     this.logger.log(`Initialized with ${this.providers.length} providers`);
   }
@@ -29,6 +30,7 @@ export class MoviesService {
     query: string,
     page: number,
     pageSize: number,
+    userId?: string,
   ): Promise<PaginatedMovies> {
     // Query all providers in parallel
     const providerResults = await Promise.all(
@@ -56,6 +58,14 @@ export class MoviesService {
     // we just take what we have)
     const items = await this.enrichMovies(grouped);
 
+    // Sort by name (per subject requirements)
+    items.sort((a, b) => a.title.localeCompare(b.title));
+
+    // Add watched status if user is authenticated
+    if (userId) {
+      await this.addWatchedStatus(items, userId);
+    }
+
     return {
       items,
       page,
@@ -68,7 +78,11 @@ export class MoviesService {
   /**
    * Get popular movies across all providers
    */
-  async popular(page: number, pageSize: number): Promise<PaginatedMovies> {
+  async popular(
+    page: number,
+    pageSize: number,
+    userId?: string,
+  ): Promise<PaginatedMovies> {
     // Query all providers in parallel
     const providerResults = await Promise.all(
       this.providers.map((provider) =>
@@ -88,7 +102,7 @@ export class MoviesService {
       totalApprox += result.total;
     }
 
-    // Sort merged results by seeders (best overall popularity)
+    // Sort merged results by seeders/downloads (best overall popularity)
     allHits.sort((a, b) => (b.seeders ?? 0) - (a.seeders ?? 0));
 
     // Take only pageSize items from merged results
@@ -99,6 +113,11 @@ export class MoviesService {
 
     // Enrich with OMDb metadata
     const items = await this.enrichMovies(grouped);
+
+    // Add watched status if user is authenticated
+    if (userId) {
+      await this.addWatchedStatus(items, userId);
+    }
 
     return {
       items,
@@ -112,7 +131,7 @@ export class MoviesService {
   /**
    * Get movie details by internal ID
    */
-  async getById(id: string): Promise<MovieDetails> {
+  async getById(id: string, userId?: string): Promise<MovieDetails> {
     // Parse the ID to get provider and externalId
     const parsed = this.parseMovieId(id);
 
@@ -134,10 +153,10 @@ export class MoviesService {
       throw new NotFoundException(`Movie ${id} not found`);
     }
 
-    // Get OMDb metadata
+    // Get metadata (TMDB first, OMDB fallback)
     const metadata = hit.imdbId
-      ? await this.omdbService.getMetadata(hit.imdbId)
-      : await this.omdbService.getMetadata(hit.title, hit.year);
+      ? await this.metadataService.getMetadata(hit.imdbId)
+      : await this.metadataService.getMetadata(hit.title, hit.year);
 
     // Also check other providers for this movie (by title+year match)
     const sources: MovieSource[] = [this.hitToSource(hit)];
@@ -165,6 +184,15 @@ export class MoviesService {
       }
     }
 
+    // Check if watched by user
+    let isWatched = false;
+    if (userId) {
+      const watched = await this.prisma.watchedMovie.findUnique({
+        where: { userId_movieId: { userId, movieId: id } },
+      });
+      isWatched = !!watched;
+    }
+
     return {
       id,
       title: hit.title,
@@ -178,21 +206,53 @@ export class MoviesService {
       actors: metadata?.actors,
       providers: [...new Set(sources.map((s) => s.provider))],
       sources,
+      isWatched,
     };
   }
 
   /**
-   * Generate a stable internal movie ID from provider and externalId
+   * Mark a movie as watched for a user
    */
-  private generateMovieId(provider: string, externalId: string): string {
-    const input = `${provider}:${externalId}`;
-    return createHash('sha256').update(input).digest('hex').slice(0, 16);
+  async markWatched(userId: string, movieId: string, progress?: number): Promise<void> {
+    await this.prisma.watchedMovie.upsert({
+      where: { userId_movieId: { userId, movieId } },
+      update: { watchedAt: new Date(), progress },
+      create: { userId, movieId, progress },
+    });
+  }
+
+  /**
+   * Remove watched status for a movie
+   */
+  async markUnwatched(userId: string, movieId: string): Promise<void> {
+    await this.prisma.watchedMovie.deleteMany({
+      where: { userId, movieId },
+    });
+  }
+
+  /**
+   * Add watched status to movie list items (efficient batch query)
+   */
+  private async addWatchedStatus(items: MovieListItem[], userId: string): Promise<void> {
+    if (items.length === 0) return;
+
+    const movieIds = items.map((item) => item.id);
+    const watchedRecords = await this.prisma.watchedMovie.findMany({
+      where: {
+        userId,
+        movieId: { in: movieIds },
+      },
+      select: { movieId: true },
+    });
+
+    const watchedSet = new Set(watchedRecords.map((r: { movieId: string }) => r.movieId));
+    for (const item of items) {
+      item.isWatched = watchedSet.has(item.id);
+    }
   }
 
   /**
    * Parse a movie ID back to provider and externalId
-   * Since we use a hash, we need to store the mapping.
-   * For simplicity, we'll encode provider:externalId in base64 instead.
    */
   private encodeMovieId(provider: string, externalId: string): string {
     return Buffer.from(`${provider}:${externalId}`).toString('base64url');
@@ -276,7 +336,7 @@ export class MoviesService {
 
     // Fetch metadata in parallel (with batching in the service)
     const metadataPromises = metadataRequests.map(async (req) => {
-      const metadata = await this.omdbService.getMetadata(
+      const metadata = await this.metadataService.getMetadata(
         req.titleOrImdbId,
         req.year,
       );
@@ -287,11 +347,19 @@ export class MoviesService {
 
     for (const { req, metadata } of results) {
       const group = grouped.get(req.id)!;
+      // Use metadata poster or fallback to provider's cover image
+      const posterUrl = metadata?.posterUrl || req.hit.coverUrl;
+
+      // Skip movies without poster - no point showing them
+      if (!posterUrl) {
+        continue;
+      }
+
       items.push({
         id: req.id,
         title: req.hit.title,
         year: req.hit.year,
-        posterUrl: metadata?.posterUrl,
+        posterUrl,
         imdbRating: metadata?.imdbRating,
         genre: metadata?.genre,
         providers: [...new Set(group.hits.map((h) => h.provider))],
@@ -302,10 +370,14 @@ export class MoviesService {
   }
 
   private hitToSource(hit: ProviderMovieHit): MovieSource {
+    // For Archive.org, magnet field contains torrent URL
+    const isArchive = hit.provider === 'archive';
     return {
       provider: hit.provider,
       externalId: hit.externalId,
-      magnet: hit.magnet,
+      magnet: isArchive ? undefined : hit.magnet,
+      torrentUrl: isArchive ? hit.magnet : undefined,
+      quality: hit.quality,
       seeders: hit.seeders,
       leechers: hit.leechers,
       size: hit.size,

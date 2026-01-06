@@ -1,3 +1,3 @@
-export * from './movie-provider.interface';
-export { CatalogAProvider } from './catalog-a.provider';
-export { CatalogBProvider } from './catalog-b.provider';
+export { MovieProvider, MOVIE_PROVIDERS } from './movie-provider.interface';
+export { YtsProvider } from './yts.provider';
+export { InternetArchiveProvider } from './internet-archive.provider';

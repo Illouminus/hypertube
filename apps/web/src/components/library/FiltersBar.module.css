@@ -1,0 +1,115 @@
+.filtersBar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+
+.filterGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filterLabel {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+}
+
+.select {
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25rem 1.25rem;
+}
+
+.select:hover {
+    border-color: rgba(233, 69, 96, 0.5);
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.select:focus {
+    outline: none;
+    border-color: rgba(233, 69, 96, 0.6);
+    box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.2);
+}
+
+.input {
+    width: 80px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.input:hover {
+    border-color: rgba(233, 69, 96, 0.5);
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.input:focus {
+    outline: none;
+    border-color: rgba(233, 69, 96, 0.6);
+    box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.2);
+}
+
+.yearSeparator {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.clearButton {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.clearButton:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 768px) {
+    .filtersBar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filterGroup {
+        justify-content: space-between;
+    }
+
+    .select,
+    .input {
+        flex: 1;
+        min-width: 0;
+    }
+}

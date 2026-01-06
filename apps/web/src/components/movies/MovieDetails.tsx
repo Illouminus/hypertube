@@ -1,8 +1,10 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { MovieDetails as MovieDetailsType } from '@/lib/movies';
+import type { MovieDetails as MovieDetailsType, MovieSource } from '@/lib/movies';
+import { markMovieWatched, markMovieUnwatched } from '@/lib/movies';
 import styles from './MovieDetails.module.css';
 
 interface MovieDetailsProps {
@@ -11,6 +13,43 @@ interface MovieDetailsProps {
 
 export function MovieDetails({ movie }: MovieDetailsProps) {
   const genres = movie.genre?.split(', ') || [];
+  const [isWatched, setIsWatched] = useState(movie.isWatched ?? false);
+  const [isToggling, setIsToggling] = useState(false);
+
+  const handleToggleWatched = useCallback(async () => {
+    try {
+      setIsToggling(true);
+      if (isWatched) {
+        await markMovieUnwatched(movie.id);
+        setIsWatched(false);
+      } else {
+        await markMovieWatched(movie.id);
+        setIsWatched(true);
+      }
+    } catch (error) {
+      console.error('Failed to toggle watched status:', error);
+    } finally {
+      setIsToggling(false);
+    }
+  }, [movie.id, isWatched]);
+
+  const handleDownload = useCallback((source: MovieSource) => {
+    const url = source.magnet || source.torrentUrl;
+    if (url) {
+      window.open(url, '_blank');
+    }
+  }, []);
+
+  const watchedButtonClass = isWatched
+    ? `${styles.watchedButton} ${styles.watchedButtonActive}`
+    : styles.watchedButton;
+
+  // Format provider name for display
+  const formatProvider = (provider: string) => {
+    if (provider === 'yts') return 'YTS';
+    if (provider === 'archive') return 'Archive.org';
+    return provider;
+  };
 
   return (
     <div className={styles.container}>
@@ -36,9 +75,20 @@ export function MovieDetails({ movie }: MovieDetailsProps) {
               <div className={styles.posterPlaceholder}>🎬</div>
             )}
           </div>
-          <button className={styles.playButton} disabled>
-            <span className={styles.playIcon}>▶</span>
-            Streaming coming next stage
+
+          <button
+            className={watchedButtonClass}
+            onClick={handleToggleWatched}
+            disabled={isToggling}
+          >
+            <span className={styles.watchedIcon}>
+              {isWatched ? '✓' : '○'}
+            </span>
+            {isToggling
+              ? 'Updating...'
+              : isWatched
+                ? 'Marked as Watched'
+                : 'Mark as Watched'}
           </button>
         </div>
 
@@ -88,30 +138,43 @@ export function MovieDetails({ movie }: MovieDetailsProps) {
             )}
           </div>
 
-          {/* Sources/Providers */}
+          {/* Download Sources */}
           {movie.sources && movie.sources.length > 0 && (
             <div className={styles.sourcesSection}>
-              <h3 className={styles.sourcesTitle}>Available Sources</h3>
+              <h3 className={styles.sourcesTitle}>Download Options</h3>
               <div className={styles.sourcesList}>
                 {movie.sources.map((source, index) => (
                   <div key={index} className={styles.sourceItem}>
-                    <span className={styles.sourceProvider}>
-                      {source.provider.replace('catalog', 'Source ')}
-                    </span>
-                    <div className={styles.sourceInfo}>
-                      {source.size && <span>{source.size}</span>}
-                      {source.seeders !== undefined && (
+                    <div className={styles.sourceMain}>
+                      <span className={styles.sourceProvider}>
+                        {formatProvider(source.provider)}
+                      </span>
+                      {source.quality && (
+                        <span className={styles.sourceQuality}>{source.quality}</span>
+                      )}
+                      {source.size && (
+                        <span className={styles.sourceSize}>{source.size}</span>
+                      )}
+                    </div>
+                    <div className={styles.sourceStats}>
+                      {source.seeders !== undefined && source.seeders > 0 && (
                         <span className={styles.sourceSeeders}>
                           ↑ {source.seeders}
                         </span>
                       )}
-                      {source.leechers !== undefined && (
+                      {source.leechers !== undefined && source.leechers > 0 && (
                         <span className={styles.sourceLeechers}>
                           ↓ {source.leechers}
                         </span>
                       )}
-                      {source.language && <span>{source.language}</span>}
                     </div>
+                    <button
+                      className={styles.downloadButton}
+                      onClick={() => handleDownload(source)}
+                      disabled={!source.magnet && !source.torrentUrl}
+                    >
+                      {source.magnet ? '📥 Magnet' : '📦 Torrent'}
+                    </button>
                   </div>
                 ))}
               </div>

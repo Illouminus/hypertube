@@ -9,12 +9,15 @@ export interface MovieListItem {
   imdbRating?: string;
   genre?: string;
   providers: string[];
+  isWatched?: boolean;
 }
 
 export interface MovieSource {
   provider: string;
   externalId: string;
   magnet?: string;
+  torrentUrl?: string;
+  quality?: string;
   seeders?: number;
   leechers?: number;
   size?: string;
@@ -72,4 +75,23 @@ export async function getPopularMovies(
  */
 export async function getMovieById(id: string): Promise<MovieDetails> {
   return api.get<MovieDetails>(`/movies/${id}`);
+}
+
+/**
+ * Mark a movie as watched
+ */
+export async function markMovieWatched(
+  movieId: string,
+  progress?: number,
+): Promise<{ success: boolean }> {
+  return api.post<{ success: boolean }>(`/movies/${movieId}/watched`, { progress });
+}
+
+/**
+ * Mark a movie as unwatched
+ */
+export async function markMovieUnwatched(
+  movieId: string,
+): Promise<{ success: boolean }> {
+  return api.delete<{ success: boolean }>(`/movies/${movieId}/watched`);
 }

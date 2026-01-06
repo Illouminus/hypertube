@@ -10,10 +10,20 @@ interface MovieCardProps {
 }
 
 export function MovieCard({ movie }: MovieCardProps) {
+  const cardClasses = movie.isWatched
+    ? `${styles.card} ${styles.watched}`
+    : styles.card;
+
   return (
     <Link href={`/movies/${movie.id}`} className={styles.cardLink}>
-      <article className={styles.card}>
+      <article className={cardClasses}>
         <div className={styles.posterContainer}>
+          {movie.isWatched && (
+            <div className={styles.watchedBadge}>
+              <span className={styles.watchedIcon}>✓</span>
+              Watched
+            </div>
+          )}
           {movie.posterUrl ? (
             <Image
               src={movie.posterUrl}
@@ -36,13 +46,6 @@ export function MovieCard({ movie }: MovieCardProps) {
           <h3 className={styles.title}>{movie.title}</h3>
           <div className={styles.meta}>
             {movie.year && <span className={styles.year}>{movie.year}</span>}
-            <div className={styles.providers}>
-              {movie.providers.slice(0, 2).map((provider) => (
-                <span key={provider} className={styles.providerBadge}>
-                  {provider.replace('catalog', '')}
-                </span>
-              ))}
-            </div>
           </div>
           {movie.genre && <span className={styles.genre}>{movie.genre}</span>}
         </div>

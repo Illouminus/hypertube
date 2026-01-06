@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { MoviesController } from './movies.controller';
 import { MoviesService } from './movies.service';
 import { OmdbService } from './omdb';
+import { TmdbService } from './tmdb';
+import { MetadataService } from './metadata';
 import {
-  CatalogAProvider,
-  CatalogBProvider,
+  YtsProvider,
+  InternetArchiveProvider,
   MOVIE_PROVIDERS,
 } from './providers';
 
@@ -13,18 +15,20 @@ import {
   providers: [
     MoviesService,
     OmdbService,
-    CatalogAProvider,
-    CatalogBProvider,
+    TmdbService,
+    MetadataService,
+    YtsProvider,
+    InternetArchiveProvider,
     // Inject all providers as an array
     {
       provide: MOVIE_PROVIDERS,
-      useFactory: (catalogA: CatalogAProvider, catalogB: CatalogBProvider) => [
-        catalogA,
-        catalogB,
-      ],
-      inject: [CatalogAProvider, CatalogBProvider],
+      useFactory: (
+        yts: YtsProvider,
+        archive: InternetArchiveProvider,
+      ) => [yts, archive],
+      inject: [YtsProvider, InternetArchiveProvider],
     },
   ],
   exports: [MoviesService],
 })
-export class MoviesModule {}
+export class MoviesModule { }
