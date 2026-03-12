@@ -1,0 +1,44 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// User model with fields for authentication, profile, and metadata. Password is optional for users authenticated via 42/Google.
+model User {
+  id                String   @id @default(uuid())
+  username          String   @unique
+  email             String   @unique
+  firstName         String
+  lastName          String
+  
+  // Password is optional to allow for users authenticated via 42 or Google. For local auth, it will be required.
+  password          String?  
+  
+  // Default profile picture and language
+  profilePictureUrl String   @default("https://default-avatar.com/avatar.png")
+  preferredLanguage String   @default("en")
+  
+  // Omniauth ID (for linking third-party accounts)
+  fortytwoId        String?  @unique
+  googleId          String?  @unique
+  
+  // Security tokens
+  resetPasswordToken   String?  @unique
+  resetPasswordExpires DateTime?
+  
+  // Metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // In the future, here will be relationships with comments and watched movies
+}
