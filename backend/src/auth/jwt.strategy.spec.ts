@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtStrategy } from './jwt.strategy';
+import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersService } from 'src/users/users.service';
 import { UserEntity } from 'src/users/entities/user.entity';
 
@@ -15,7 +15,7 @@ const createUser = () =>
     password: 'hashed-password',
     profilePictureUrl: 'https://default-avatar.com/avatar.png',
     preferredLanguage: 'en',
-    fortytwoId: null,
+    fortyTwoId: null,
     googleId: null,
     resetPasswordToken: null,
     resetPasswordExpires: null,

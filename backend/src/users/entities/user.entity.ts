@@ -10,13 +10,12 @@ export class UserEntity implements User {
     lastName: string;
     profilePictureUrl: string;
     preferredLanguage: string;
-    fortytwoId: string | null;
+    fortyTwoId: string | null;
     googleId: string | null;
     resetPasswordToken: string | null;
     resetPasswordExpires: Date | null;
     createdAt: Date;
     updatedAt: Date;
-
 
     @Exclude()
     password: string | null;

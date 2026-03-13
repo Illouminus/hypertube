@@ -29,7 +29,7 @@ model User {
   preferredLanguage String   @default("en")
   
   // Omniauth ID (for linking third-party accounts)
-  fortytwoId        String?  @unique
+  fortyTwoId        String?  @unique
   googleId          String?  @unique
   
   // Security tokens

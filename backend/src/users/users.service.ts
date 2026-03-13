@@ -4,6 +4,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { CreateLocalUserDto } from './dto/create-local-user.dto';
 import { UserEntity } from './entities/user.entity';
+import { FortyTwoProfile } from 'src/auth/interfaces/fortytwo-profile.interface';
 
 @Injectable()
 export class UsersService {
@@ -62,4 +63,56 @@ export class UsersService {
 
         return user ? new UserEntity(user) : null;
     }
+
+    async findOrCreateFortyTwoUser(profile: FortyTwoProfile): Promise<UserEntity> {
+        const fortyTwoId = profile.id.toString();
+        const email = profile.emails[0].value;
+
+        // Try to find an existing user with the same 42 ID or email
+        let user = await this.prisma.user.findUnique({
+            where: {fortyTwoId},
+        });
+
+        if(user) {
+            return new UserEntity(user);
+        }
+
+        // If user with the 42 ID doesn't exist, check if there's a user with the same email (to link accounts)
+        user = await this.prisma.user.findUnique({
+            where: { email },
+        });
+
+        if(user) {
+            user = await this.prisma.user.update({
+                where: {id: user.id},
+                data: {fortyTwoId}
+            });
+            return new UserEntity(user);
+        }
+
+        // We should protect the case if the username is already taken  by some local profile 
+        let finalUsername = profile.username;
+        const existingUsername = await this.prisma.user.findUnique({
+            where: { username: finalUsername },
+        });
+        if(existingUsername) {
+            finalUsername = `${profile.username}_42_${Math.floor(Math.random() * 1000)}`;
+        }
+
+
+        // If no user exists with the 42 ID or email, create a new user
+        const newUser = await this.prisma.user.create({
+            data: {
+                username: finalUsername,
+                email,
+                firstName: profile.name.givenName,
+                lastName: profile.name.familyName,
+                fortyTwoId,
+                profilePictureUrl: profile.photos[0]?.value || 'https://default-avatar.com/avatar.png',
+            }
+        });
+
+        return new UserEntity(newUser);
+    }
+    
 }

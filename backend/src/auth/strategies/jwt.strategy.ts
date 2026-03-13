@@ -2,9 +2,17 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtPayload } from './interfaces/jwt-payload.interface';
-import { UsersService } from '../users/users.service';
-import { UserEntity } from '../users/entities/user.entity';
+import { JwtPayload } from '../interfaces/jwt-payload.interface';
+import { UsersService } from '../../users/users.service';
+import { UserEntity } from '../../users/entities/user.entity';
+import type { Request } from 'express';
+
+const cookieExtractor = (req: Request): string | null => {
+  if (!req || !req.cookies) {
+    return null;
+  }
+  return req.cookies['access_token'] ?? null;
+};
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -13,7 +21,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private usersService: UsersService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        cookieExtractor,
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       ignoreExpiration: false, // Refuse expired tokens
       secretOrKey: configService.getOrThrow<string>('JWT_SECRET'), // Secret key for signature verification
     });

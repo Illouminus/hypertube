@@ -20,7 +20,7 @@ const createUser = (overrides: Partial<UserEntity> = {}) =>
     password: 'hashed-password',
     profilePictureUrl: 'https://default-avatar.com/avatar.png',
     preferredLanguage: 'en',
-    fortytwoId: null,
+    fortyTwoId: null,
     googleId: null,
     resetPasswordToken: null,
     resetPasswordExpires: null,
