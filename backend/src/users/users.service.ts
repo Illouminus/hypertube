@@ -46,4 +46,13 @@ export class UsersService {
 
         return new UserEntity(newUser);
     }
+
+    async findByEmail(email: string): Promise<UserEntity | null> {
+        const user = await this.prisma.user.findUnique({
+            where: { email },
+        });
+
+        return user ? new UserEntity(user) : null;
+    }
+
 }
