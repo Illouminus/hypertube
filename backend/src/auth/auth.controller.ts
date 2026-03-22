@@ -16,10 +16,7 @@ export class AuthController {
 
     @HttpCode(HttpStatus.OK)
     @Post('login')
-    async login(
-        @Body() loginDto: LoginDto,
-        @Res({ passthrough: true }) res: Response,
-    ): Promise<{ success: true }> {
+    async login( @Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<{ success: true }> {
         const { email, password } = loginDto;
         const user = await this.authService.validateUser(email, password);
         const { access_token } = await this.authService.login(user);
@@ -60,11 +57,7 @@ export class AuthController {
 
     @UseGuards(FortyTwoAuthGuard)
     @Get('42/callback')
-    @Redirect(undefined, 302)
-    async fortyTwoAuthRedirect(
-        @CurrentUser() user: UserEntity,
-        @Res({ passthrough: true }) res: Response,
-    ): Promise<{ url: string }> {
+    @Redirect(undefined, 302) async fortyTwoAuthRedirect(@CurrentUser() user: UserEntity, @Res({ passthrough: true }) res: Response): Promise<{ url: string }> {
         // This route will be called by 42 after the user authorizes the application.
         // The FortyTwoAuthGuard will handle the callback, extract the user information, and create a JWT token.
         // We set the JWT token in an httpOnly cookie and redirect to the frontend.
