@@ -147,4 +147,24 @@ describe('AuthController', () => {
       expect(result).toEqual({ url: 'http://localhost:3000/login/success' });
     });
   });
+
+  describe('googleAuthRedirect', () => {
+    it('sets cookie and returns frontend redirect url', async () => {
+      const user = createUser();
+      const res = { cookie: jest.fn() } as any;
+      authService.login.mockResolvedValue({ access_token: 'google-oauth-token' });
+
+      const result = await controller.googleAuthRedirect(user, res);
+
+      expect(authService.login).toHaveBeenCalledWith(user);
+      expect(res.cookie).toHaveBeenCalledWith('access_token', 'google-oauth-token', {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 1000,
+        path: '/',
+      });
+      expect(result).toEqual({ url: 'http://localhost:3000/login/success' });
+    });
+  });
 });
