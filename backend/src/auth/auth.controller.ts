@@ -8,6 +8,8 @@ import { GoogleAuthGuard } from './guard/google-auth.guard';
 import { JwtAuthGuard } from './guard/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -86,5 +88,20 @@ export class AuthController {
     @Redirect(undefined, 302)
     async googleAuthRedirect(@CurrentUser() user: UserEntity, @Res({ passthrough: true }) res: Response): Promise<{ url: string }> {
         return this.setTokenCookieAndGetRedirectUrl(user, res);
+    }
+
+
+    @HttpCode(HttpStatus.OK)
+    @Post('forgot-password')
+    async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
+        this.authService.forgotPassword(forgotPasswordDto.email);
+        return { message: 'If an account with that email exists, a password reset link has been sent.' };
+    }
+
+    @HttpCode(HttpStatus.OK)
+    @Post('reset-password')
+    async resetPassword(@Body() resetPasswordDto: ResetPasswordDto): Promise<{ success: boolean }> {
+        await this.authService.resetPassword(resetPasswordDto);
+        return { success: true };
     }
 }
