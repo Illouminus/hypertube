@@ -6,6 +6,7 @@ import { CreateLocalUserDto } from './dto/create-local-user.dto';
 import { UserEntity } from './entities/user.entity';
 import { FortyTwoProfile } from 'src/auth/interfaces/fortytwo-profile.interface';
 import { GoogleProfile } from 'src/auth/interfaces/google-profile.interface';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -166,5 +167,43 @@ export class UsersService {
 
         return new UserEntity(newUser);
     }
-    
+
+    async updateUser(id: string, updateUserDTO: UpdateUserDto): Promise<UserEntity> {
+        const { username, email, password, ...restData } = updateUserDTO;    
+
+        // Should verify if email and username are not already taken by another user
+        if (email || username) {
+            const existingUser = await this.prisma.user.findFirst({
+                where: {
+                    OR: [
+                        email ? { email } : {},
+                        username ? { username } : {},
+                    ],
+                    NOT: { id }, // Exclude the current user from the search
+                },
+            });
+
+            if (existingUser) {
+                throw new ConflictException('Email or username is already in use by another account');
+            }
+        }
+
+        let hashedPassword: string | undefined;
+        if (password) {
+            const saltRounds = 10;
+            hashedPassword = await bcrypt.hash(password, saltRounds);
+        }
+
+        const updatedUser = await this.prisma.user.update({
+            where: { id },
+            data: {
+                ...restData,
+                ...(email && { email }),
+                ...(username && { username }),
+                ...(hashedPassword && { password: hashedPassword }),
+            },
+        });
+
+        return new UserEntity(updatedUser);
+    }
 }

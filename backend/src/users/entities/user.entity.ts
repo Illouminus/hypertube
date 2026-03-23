@@ -1,11 +1,14 @@
-import { Exclude } from "class-transformer";
+import { Exclude, Expose } from "class-transformer";
 import type { User } from "generated/prisma/client";
 
 
 export class UserEntity implements User {
     id: string;
     username: string;
+
+    @Exclude()
     email: string;
+
     firstName: string;
     lastName: string;
     profilePictureUrl: string;
@@ -22,5 +25,10 @@ export class UserEntity implements User {
 
     constructor(partial: Partial<UserEntity>) {
         Object.assign(this, partial);
+    }
+
+    @Expose({ groups: ['self'] })
+    get userEmail(): string {
+        return this.email;
     }
 }
