@@ -30,6 +30,15 @@ export class MoviesController {
     }
     
     @Post('trigger-scraper')
+    @ApiOperation({ summary: 'Trigger background scraper job manually' })
+    @ApiOkResponse({
+        schema: {
+            type: 'object',
+            properties: {
+                message: { type: 'string', example: 'Jackett scraping started in background!' },
+            },
+        },
+    })
     async triggerScraper() {
         this.moviesCronService.fetchAndCacheJackettMovies();
         return { message: 'Jackett scraping started in background!' };

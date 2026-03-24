@@ -10,7 +10,9 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
     constructor(
@@ -46,6 +48,16 @@ export class AuthController {
 
     @HttpCode(HttpStatus.OK)
     @Post('login')
+    @ApiOperation({ summary: 'Login with email and password' })
+    @ApiBody({ type: LoginDto })
+    @ApiOkResponse({
+        schema: {
+            type: 'object',
+            properties: {
+                success: { type: 'boolean', example: true },
+            },
+        },
+    })
     async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<{ success: boolean }> {
         const { email, password } = loginDto;
         const user = await this.authService.validateUser(email, password);
@@ -63,6 +75,7 @@ export class AuthController {
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     @Post('logout')
+    @ApiOperation({ summary: 'Logout current user and clear auth cookie' })
     async logout(@Res({ passthrough: true }) res: Response): Promise<{ success: boolean }> {
         res.clearCookie('access_token', this.getCookieOptions());
         return { success: true };
@@ -70,22 +83,26 @@ export class AuthController {
 
     @UseGuards(FortyTwoAuthGuard)
     @Get('42')
+    @ApiOperation({ summary: 'Start 42 OAuth flow' })
     async fortyTwoAuth() {}
 
     @UseGuards(FortyTwoAuthGuard)
     @Get('42/callback')
     @Redirect(undefined, 302)
+    @ApiOperation({ summary: '42 OAuth callback' })
     async fortyTwoAuthRedirect(@CurrentUser() user: UserEntity, @Res({ passthrough: true }) res: Response): Promise<{ url: string }> {
         return this.setTokenCookieAndGetRedirectUrl(user, res);
     }
 
     @UseGuards(GoogleAuthGuard)
     @Get('google')
+    @ApiOperation({ summary: 'Start Google OAuth flow' })
     async googleAuth() {}
 
     @UseGuards(GoogleAuthGuard)
     @Get('google/callback')
     @Redirect(undefined, 302)
+    @ApiOperation({ summary: 'Google OAuth callback' })
     async googleAuthRedirect(@CurrentUser() user: UserEntity, @Res({ passthrough: true }) res: Response): Promise<{ url: string }> {
         return this.setTokenCookieAndGetRedirectUrl(user, res);
     }
@@ -93,6 +110,8 @@ export class AuthController {
 
     @HttpCode(HttpStatus.OK)
     @Post('forgot-password')
+    @ApiOperation({ summary: 'Request password reset link' })
+    @ApiBody({ type: ForgotPasswordDto })
     async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
         this.authService.forgotPassword(forgotPasswordDto.email);
         return { message: 'If an account with that email exists, a password reset link has been sent.' };
@@ -100,6 +119,8 @@ export class AuthController {
 
     @HttpCode(HttpStatus.OK)
     @Post('reset-password')
+    @ApiOperation({ summary: 'Reset password using token' })
+    @ApiBody({ type: ResetPasswordDto })
     async resetPassword(@Body() resetPasswordDto: ResetPasswordDto): Promise<{ success: boolean }> {
         await this.authService.resetPassword(resetPasswordDto);
         return { success: true };
