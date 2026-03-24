@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
-import { EmailModule } from './email/email.module';
 import { MailModule } from './mail/mail.module';
+import { MoviesModule } from './movies/movies.module';
 
 @Module({
   imports: [
@@ -14,11 +15,12 @@ import { MailModule } from './mail/mail.module';
       envFilePath: '../.env',
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     UsersModule,
     AuthModule,
-    EmailModule,
     MailModule,
+    MoviesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -6,6 +6,7 @@
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
@@ -41,4 +42,55 @@ model User {
   updatedAt         DateTime @updatedAt
   
   // In the future, here will be relationships with comments and watched movies
+}
+
+
+model Movie {
+  id          String   @id @default(uuid())
+  imdbId       String   @unique
+  title       String
+  year        Int
+  rating      Float @default(0.0) // Average rating, default to 0.0 if not provided
+  runtime     Int @default(0) // Runtime in minutes, default to 0 if not provided
+  genres      String[] // Array of genres
+  summary     String @db.Text
+  coverImageUrl String
+  
+
+  // Cast and crew 
+  director    String?
+  cast       String[] // Array of main cast members
+
+  // If the fils isn't watched over a month, it will be deleted from the database
+  lastViewedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  torrents Torrent[] // Relationship to Torrent model
+  // comments Comment[] // Relationship to Comment model
+  
+  // In the future, here will be relationships with comments and users who watched the movie
+}
+
+
+model Torrent {
+  id        String   @id @default(uuid())
+  hash      String   @unique // Unique hash for the torrent
+  magnet    String // Magnet link for the torrent
+  quality   String // Quality of the torrent (e.g., 720p, 1080p)
+  size      String // Size of the torrent in bytes
+  seeds     Int @default(0) // Number of seeds for the torrent
+  peers     Int @default(0) // Number of peers for the torrent
+
+  // Status of the torrent (e.g., "available", "downloading", "downloaded")
+  isDownloaded Boolean @default(false)
+  filePath    String? // File path where the torrent is stored after download
+
+  // Relationship to Movie model
+  movieId    String
+  movie      Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

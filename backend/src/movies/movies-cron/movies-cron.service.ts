@@ -1,0 +1,319 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import { firstValueFrom } from 'rxjs';
+import { PrismaService } from 'src/prisma/prisma.service';
+
+@Injectable()
+export class MoviesCronService {
+    private readonly logger = new Logger(MoviesCronService.name);
+    private readonly requestTimeoutMs = 10_000;
+
+    constructor(
+        private readonly httpService: HttpService,
+        private readonly prisma: PrismaService,
+        private readonly configService: ConfigService,
+    ) {}
+
+    // @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT) // After testing, you can uncomment this line to run the job every day at midnight
+    async fetchAndCacheJackettMovies() {
+        const jackettUrl = this.configService.get<string>('JACKETT_URL');
+        const jackettApiKey = this.configService.get<string>('JACKETT_API_KEY');
+        const tmdbToken = this.configService.get<string>('TMDB_API_TOKEN');
+        const canUseTmdb = Boolean(tmdbToken);
+
+        if (!jackettUrl || !jackettApiKey) {
+            this.logger.error('Jackett URL or API Key is missing in .env');
+            return;
+        }
+
+        if (!canUseTmdb) {
+            this.logger.warn('TMDB_API_TOKEN is missing. Falling back to minimal movie metadata.');
+        }
+
+        try {
+            this.logger.log('Fetching latest movie torrents from Jackett...');
+            
+            // First, we get all movie torrents from Jackett (you can adjust the category or add more if needed)
+            const jackettResponse = await firstValueFrom(
+                this.httpService.get(`${jackettUrl}/api/v2.0/indexers/all/results`, {
+                    timeout: this.requestTimeoutMs,
+                    params: {
+                        apikey: jackettApiKey,
+                        'Category[]': 2000,
+                    },
+                }),
+            );
+
+            const results = jackettResponse.data?.Results;
+            if (!results || results.length === 0) {
+                this.logger.warn('No results found in Jackett. Check your indexers!');
+                return;
+            }
+
+            this.logger.log(`Found ${results.length} torrents. Processing metadata...`);
+
+            // Cache movies by IMDb ID to avoid duplicate DB/TMDb work in one run.
+            const movieByImdb = new Map<string, Awaited<ReturnType<PrismaService['movie']['findUnique']>>>();
+            let enrichedFromTmdbCount = 0;
+            let fallbackMovieCreatedCount = 0;
+            let skippedInvalidItemCount = 0;
+
+            for (const item of results) {
+                try {
+                    if (!item?.Imdb || !item?.MagnetUri) continue;
+
+                    const title = typeof item.Title === 'string' ? item.Title : 'Unknown title';
+                    const imdbId = this.normalizeImdbId(item.Imdb);
+                    if (!imdbId) continue;
+
+                    const hash = this.extractHash(item.MagnetUri);
+                    if (!hash) continue;
+
+                    let movie = movieByImdb.get(imdbId);
+                    if (movie === undefined) {
+                        movie = await this.prisma.movie.findUnique({ where: { imdbId } });
+                    }
+
+                    const shouldFetchTmdb = canUseTmdb && (!movie || this.needsEnrichment(movie));
+                    if (shouldFetchTmdb) {
+                        try {
+                            const tmdbResponse = await firstValueFrom(
+                                this.httpService.get(`https://api.themoviedb.org/3/find/${imdbId}`, {
+                                    timeout: this.requestTimeoutMs,
+                                    headers: { Authorization: `Bearer ${tmdbToken}` },
+                                    params: { external_source: 'imdb_id' },
+                                }),
+                            );
+
+                            const movieData = tmdbResponse.data?.movie_results?.[0];
+                            if (movieData) {
+                                const tmdbMovieId = this.toNonNegativeInt(movieData.id);
+                                const details = tmdbMovieId
+                                    ? await this.fetchTmdbMovieDetails(tmdbMovieId, tmdbToken as string)
+                                    : null;
+
+                                const year = this.parseYear(details?.release_date ?? movieData.release_date);
+                                const genres = this.extractGenreNames(details?.genres);
+                                const cast = this.extractTopCast(details?.credits?.cast);
+                                const director = this.extractDirector(details?.credits?.crew);
+
+                                movie = await this.prisma.movie.upsert({
+                                    where: { imdbId },
+                                    update: {
+                                        title: movieData.title || title,
+                                        year,
+                                        rating: details?.vote_average ?? movieData.vote_average ?? 0,
+                                        runtime: this.toNonNegativeInt(details?.runtime),
+                                        genres,
+                                        summary: details?.overview || movieData.overview || '',
+                                        coverImageUrl: (details?.poster_path || movieData.poster_path)
+                                            ? `https://image.tmdb.org/t/p/w500${details?.poster_path || movieData.poster_path}`
+                                            : 'https://via.placeholder.com/500x750?text=No+Poster',
+                                        director,
+                                        cast,
+                                    },
+                                    create: {
+                                        imdbId,
+                                        title: movieData.title || title,
+                                        year,
+                                        rating: details?.vote_average ?? movieData.vote_average ?? 0,
+                                        runtime: this.toNonNegativeInt(details?.runtime),
+                                        genres,
+                                        summary: details?.overview || movieData.overview || '',
+                                        coverImageUrl: (details?.poster_path || movieData.poster_path)
+                                            ? `https://image.tmdb.org/t/p/w500${details?.poster_path || movieData.poster_path}`
+                                            : 'https://via.placeholder.com/500x750?text=No+Poster',
+                                        director,
+                                        cast,
+                                    },
+                                });
+                                enrichedFromTmdbCount += 1;
+                            }
+                        } catch (tmdbError) {
+                            this.logger.warn(`TMDb API error for ${imdbId}: ${this.extractErrorMessage(tmdbError)}`);
+                        }
+                    }
+
+                    if (!movie) {
+                        // Keep torrent ingestion resilient even when TMDb data is unavailable.
+                        movie = await this.prisma.movie.upsert({
+                            where: { imdbId },
+                            update: {
+                                title,
+                            },
+                            create: {
+                                imdbId,
+                                title,
+                                year: 0,
+                                rating: 0,
+                                runtime: 0,
+                                genres: [],
+                                summary: '',
+                                coverImageUrl: 'https://via.placeholder.com/500x750?text=No+Poster',
+                                director: null,
+                                cast: [],
+                            },
+                        });
+                        fallbackMovieCreatedCount += 1;
+                    }
+
+                    movieByImdb.set(imdbId, movie);
+
+                    await this.prisma.torrent.upsert({
+                        where: { hash },
+                        update: {
+                            magnet: item.MagnetUri,
+                            quality: this.detectQuality(title),
+                            size: this.formatSize(item.Size),
+                            seeds: this.toNonNegativeInt(item.Seeders),
+                            peers: this.toNonNegativeInt(item.Peers),
+                            movieId: movie.id,
+                        },
+                        create: {
+                            hash,
+                            magnet: item.MagnetUri,
+                            quality: this.detectQuality(title),
+                            size: this.formatSize(item.Size),
+                            seeds: this.toNonNegativeInt(item.Seeders),
+                            peers: this.toNonNegativeInt(item.Peers),
+                            movieId: movie.id,
+                        },
+                    });
+                } catch (itemError) {
+                    skippedInvalidItemCount += 1;
+                    this.logger.warn(`Skipping invalid item: ${this.extractErrorMessage(itemError)}`);
+                }
+            }
+
+            this.logger.log(
+                `Run stats: tmdb_enriched=${enrichedFromTmdbCount}, fallback_created=${fallbackMovieCreatedCount}, skipped_invalid=${skippedInvalidItemCount}`,
+            );
+            this.logger.log('Scraping and Hydration completed successfully!');
+        } catch (error) {
+            this.logger.error('Failed to scrape from Jackett', error instanceof Error ? error.stack : String(error));
+        }
+    }
+
+    private normalizeImdbId(rawImdb: unknown): string | null {
+        if (rawImdb === null || rawImdb === undefined) return null;
+
+        const raw = String(rawImdb).trim();
+        if (!raw) return null;
+
+        if (/^tt\d{7,8}$/i.test(raw)) {
+            return raw.toLowerCase();
+        }
+
+        const digits = raw.replace(/\D/g, '');
+        if (!digits) return null;
+
+        return `tt${digits.padStart(7, '0')}`;
+    }
+
+    private extractHash(magnetUri: string): string | null {
+        const hashMatch = magnetUri.match(/btih:([a-zA-Z0-9]+)/i);
+        return hashMatch ? hashMatch[1].toLowerCase() : null;
+    }
+
+    private async fetchTmdbMovieDetails(movieId: number, token: string): Promise<any | null> {
+        const response = await firstValueFrom(
+            this.httpService.get(`https://api.themoviedb.org/3/movie/${movieId}`, {
+                timeout: this.requestTimeoutMs,
+                headers: { Authorization: `Bearer ${token}` },
+                params: {
+                    language: 'en-US',
+                    append_to_response: 'credits',
+                },
+            }),
+        );
+
+        return response.data ?? null;
+    }
+
+    private needsEnrichment(movie: NonNullable<Awaited<ReturnType<PrismaService['movie']['findUnique']>>>): boolean {
+        return (
+            movie.runtime === 0 ||
+            !movie.director ||
+            !movie.genres ||
+            movie.genres.length === 0 ||
+            !movie.cast ||
+            movie.cast.length === 0
+        );
+    }
+
+    private extractGenreNames(genres: unknown): string[] {
+        if (!Array.isArray(genres)) return [];
+
+        return genres
+            .map((genre) => {
+                if (!genre || typeof genre !== 'object') return null;
+                const name = (genre as { name?: unknown }).name;
+                return typeof name === 'string' && name.trim() ? name.trim() : null;
+            })
+            .filter((name): name is string => Boolean(name));
+    }
+
+    private extractTopCast(cast: unknown, limit = 10): string[] {
+        if (!Array.isArray(cast)) return [];
+
+        return cast
+            .map((person) => {
+                if (!person || typeof person !== 'object') return null;
+                const name = (person as { name?: unknown }).name;
+                return typeof name === 'string' && name.trim() ? name.trim() : null;
+            })
+            .filter((name): name is string => Boolean(name))
+            .slice(0, limit);
+    }
+
+    private extractDirector(crew: unknown): string | null {
+        if (!Array.isArray(crew)) return null;
+
+        const director = crew.find((member) => {
+            if (!member || typeof member !== 'object') return false;
+            const job = (member as { job?: unknown }).job;
+            return typeof job === 'string' && job.toLowerCase() === 'director';
+        });
+
+        if (!director || typeof director !== 'object') return null;
+        const name = (director as { name?: unknown }).name;
+        return typeof name === 'string' && name.trim() ? name.trim() : null;
+    }
+
+    private parseYear(releaseDate: unknown): number {
+        if (typeof releaseDate !== 'string' || releaseDate.length < 4) return 0;
+        const year = Number.parseInt(releaseDate.substring(0, 4), 10);
+        return Number.isFinite(year) ? year : 0;
+    }
+
+    private detectQuality(title: string): string {
+        const normalizedTitle = title.toLowerCase();
+        if (normalizedTitle.includes('2160p') || normalizedTitle.includes('4k')) return '2160p';
+        if (normalizedTitle.includes('1080p')) return '1080p';
+        if (normalizedTitle.includes('720p')) return '720p';
+        if (normalizedTitle.includes('3d')) return '3D';
+        return 'Unknown';
+    }
+
+    private formatSize(sizeInBytes: unknown): string {
+        const size = Number(sizeInBytes);
+        if (!Number.isFinite(size) || size <= 0) {
+            return 'Unknown';
+        }
+
+        const sizeMB = size / (1024 * 1024);
+        return sizeMB > 1024 ? `${(sizeMB / 1024).toFixed(2)} GB` : `${sizeMB.toFixed(2)} MB`;
+    }
+
+    private toNonNegativeInt(value: unknown): number {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed) || parsed < 0) return 0;
+        return Math.floor(parsed);
+    }
+
+    private extractErrorMessage(error: unknown): string {
+        if (error instanceof Error) return error.message;
+        return String(error);
+    }
+}

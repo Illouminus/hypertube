@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Torrent" ALTER COLUMN "size" SET DATA TYPE TEXT;
