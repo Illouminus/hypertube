@@ -5,7 +5,17 @@ import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { UserEntity } from './entities/user.entity';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+    ApiBadRequestResponse,
+    ApiBody,
+    ApiForbiddenResponse,
+    ApiNotFoundResponse,
+    ApiOkResponse,
+    ApiOperation,
+    ApiParam,
+    ApiTags,
+    ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 
 @ApiTags('users')
 @Controller('users')
@@ -17,6 +27,7 @@ export class UsersController {
     @ApiOperation({ summary: 'Create local user account' })
     @ApiBody({ type: CreateLocalUserDto })
     @ApiOkResponse({ type: UserEntity })
+    @ApiBadRequestResponse({ description: 'Validation failed for signup payload' })
     create(@Body() createLocalUserDto: CreateLocalUserDto) {
         return this.usersService.createLocalUser(createLocalUserDto);
     }
@@ -26,6 +37,7 @@ export class UsersController {
     @SerializeOptions({ groups: ['self'] })
     @ApiOperation({ summary: 'Get current authenticated user profile' })
     @ApiOkResponse({ type: UserEntity })
+    @ApiUnauthorizedResponse({ description: 'Authentication required' })
     getProfile(@CurrentUser() user: UserEntity): UserEntity {
         return user;
     }
@@ -35,6 +47,8 @@ export class UsersController {
     @ApiOperation({ summary: 'Get user by id' })
     @ApiParam({ name: 'id', description: 'User UUID' })
     @ApiOkResponse({ type: UserEntity })
+    @ApiUnauthorizedResponse({ description: 'Authentication required' })
+    @ApiNotFoundResponse({ description: 'User not found' })
     async getUserById(@Param('id') id: string, @CurrentUser() currentUser: UserEntity): Promise<UserEntity> {
         const user = await this.usersService.findById(id);
 
@@ -55,6 +69,9 @@ export class UsersController {
     @ApiParam({ name: 'id', description: 'User UUID' })
     @ApiBody({ type: UpdateUserDto })
     @ApiOkResponse({ type: UserEntity })
+    @ApiUnauthorizedResponse({ description: 'Authentication required' })
+    @ApiForbiddenResponse({ description: 'Cannot update another user profile' })
+    @ApiBadRequestResponse({ description: 'Validation failed for update payload' })
     async updateUser(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @CurrentUser() currentUser: UserEntity): Promise<UserEntity> {
         if (currentUser.id !== id) {
             throw new ForbiddenException(`You can only update your own profile`);
