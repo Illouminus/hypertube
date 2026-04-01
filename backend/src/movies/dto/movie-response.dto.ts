@@ -136,6 +136,8 @@ export class MoviesListResponseDto {
       page: { type: 'number' },
       limit: { type: 'number' },
       totalPages: { type: 'number' },
+      hasNextPage: { type: 'boolean' },
+      nextPage: { type: 'number', nullable: true },
     },
   })
   meta: {
@@ -143,6 +145,8 @@ export class MoviesListResponseDto {
     page: number;
     limit: number;
     totalPages: number;
+    hasNextPage: boolean;
+    nextPage: number | null;
   };
 
   constructor(params: {
@@ -151,12 +155,17 @@ export class MoviesListResponseDto {
     page: number;
     limit: number;
   }) {
+    const totalPages = Math.ceil(params.total / params.limit);
+    const hasNextPage = params.page < totalPages;
+
     this.data = params.data.map((movie) => new MovieResponseDto(movie));
     this.meta = {
       total: params.total,
       page: params.page,
       limit: params.limit,
-      totalPages: Math.ceil(params.total / params.limit),
+      totalPages,
+      hasNextPage,
+      nextPage: hasNextPage ? params.page + 1 : null,
     };
   }
 }

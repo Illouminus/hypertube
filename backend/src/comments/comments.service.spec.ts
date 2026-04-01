@@ -6,6 +6,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 describe('CommentsService', () => {
   let service: CommentsService;
   let prisma: {
+    $transaction: jest.Mock;
     movie: { findUnique: jest.Mock };
     comment: {
       findMany: jest.Mock;
@@ -13,11 +14,13 @@ describe('CommentsService', () => {
       create: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
+      count: jest.Mock;
     };
   };
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
       movie: { findUnique: jest.fn() },
       comment: {
         findMany: jest.fn(),
@@ -25,6 +28,7 @@ describe('CommentsService', () => {
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+        count: jest.fn(),
       },
     };
 
@@ -36,7 +40,9 @@ describe('CommentsService', () => {
   });
 
   it('returns movie comments with author', async () => {
-    prisma.comment.findMany.mockResolvedValue([
+    prisma.comment.findMany.mockReturnValue('findManyCall');
+    prisma.comment.count.mockReturnValue('countCall');
+    prisma.$transaction.mockResolvedValue([[
       {
         id: 'comment-1',
         movieId: 'movie-1',
@@ -52,17 +58,24 @@ describe('CommentsService', () => {
           profilePictureUrl: 'https://example.com/avatar.jpg',
         },
       },
-    ]);
+    ], 1]);
 
-    const result = await service.getMovieComments('movie-1');
+    const result = await service.getMovieComments('movie-1', { page: 1, limit: 20 });
 
-    expect(prisma.comment.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { movieId: 'movie-1' } }),
-    );
-    expect(result[0]).toEqual(
+    expect(prisma.$transaction).toHaveBeenCalledWith(['findManyCall', 'countCall']);
+    expect(result.data[0]).toEqual(
       expect.objectContaining({
         id: 'comment-1',
         author: expect.objectContaining({ username: 'neo' }),
+      }),
+    );
+    expect(result.meta).toEqual(
+      expect.objectContaining({
+        total: 1,
+        page: 1,
+        limit: 20,
+        hasNextPage: false,
+        nextPage: null,
       }),
     );
   });

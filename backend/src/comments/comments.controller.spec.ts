@@ -30,10 +30,12 @@ describe('CommentsController', () => {
   });
 
   it('returns latest comments', async () => {
-    const response = [{ id: 'comment-1' }];
+    const query = { page: 2, limit: 10 };
+    const response = { data: [{ id: 'comment-1' }], meta: { page: 2, limit: 10 } };
     commentsService.getLatestComments.mockResolvedValue(response);
 
-    await expect(controller.getLatestComments()).resolves.toEqual(response);
+    await expect(controller.getLatestComments(query)).resolves.toEqual(response);
+    expect(commentsService.getLatestComments).toHaveBeenCalledWith(query);
   });
 
   it('returns comment by id', async () => {

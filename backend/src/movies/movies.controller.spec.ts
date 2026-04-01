@@ -106,11 +106,15 @@ describe('MoviesController', () => {
 
   it('returns movie comments', async () => {
     const movieId = '91af3be9-d9d0-4e82-a347-3ece7624d6ea';
-    const response = [{ id: 'comment-1', content: 'Great movie' }];
+    const query = { page: 1, limit: 20 };
+    const response = {
+      data: [{ id: 'comment-1', content: 'Great movie' }],
+      meta: { total: 1, page: 1, limit: 20, totalPages: 1, hasNextPage: false, nextPage: null },
+    };
     commentsService.getMovieComments.mockResolvedValue(response);
 
-    await expect(controller.getMovieComments(movieId)).resolves.toEqual(response);
-    expect(commentsService.getMovieComments).toHaveBeenCalledWith(movieId);
+    await expect(controller.getMovieComments(movieId, query)).resolves.toEqual(response);
+    expect(commentsService.getMovieComments).toHaveBeenCalledWith(movieId, query);
   });
 
   it('creates a movie comment', async () => {

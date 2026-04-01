@@ -22,6 +22,8 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { CommentsService } from 'src/comments/comments.service';
 import { CommentResponseDto } from 'src/comments/dto/comment-response.dto';
 import { CreateMovieCommentDto } from 'src/comments/dto/create-movie-comment.dto';
+import { GetCommentsQueryDto } from 'src/comments/dto/get-comments-query.dto';
+import { CommentsListResponseDto } from 'src/comments/dto/comments-list-response.dto';
 
 @ApiTags('movies')
 @Controller('movies')
@@ -60,11 +62,14 @@ export class MoviesController {
     @Get(':id/comments')
     @ApiOperation({ summary: 'Get comments for one movie' })
     @ApiParam({ name: 'id', description: 'Movie UUID' })
-    @ApiOkResponse({ type: [CommentResponseDto] })
+    @ApiOkResponse({ type: CommentsListResponseDto })
     @ApiBadRequestResponse({ description: 'Invalid movie id format (must be UUID)', type: ErrorResponseDto })
     @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
-    async getMovieComments(@Param('id', new ParseUUIDPipe()) movieId: string) {
-        return this.commentsService.getMovieComments(movieId);
+    async getMovieComments(
+        @Param('id', new ParseUUIDPipe()) movieId: string,
+        @Query() query: GetCommentsQueryDto,
+    ) {
+        return this.commentsService.getMovieComments(movieId, query);
     }
 
     @UseGuards(JwtAuthGuard)

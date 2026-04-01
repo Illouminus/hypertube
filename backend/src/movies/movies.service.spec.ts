@@ -74,6 +74,8 @@ describe('MoviesService', () => {
         page: 1,
         limit: 20,
         totalPages: 0,
+        hasNextPage: false,
+        nextPage: null,
       },
     });
   });
@@ -123,6 +125,8 @@ describe('MoviesService', () => {
       page: 2,
       limit: 10,
       totalPages: 4,
+      hasNextPage: true,
+      nextPage: 3,
     });
     expect(result.data).toHaveLength(1);
     expect(result.data[0]).toEqual(

@@ -4,29 +4,44 @@ import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreateMovieCommentDto } from './dto/create-movie-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { CommentResponseDto } from './dto/comment-response.dto';
+import { GetCommentsQueryDto } from './dto/get-comments-query.dto';
+import { CommentsListResponseDto } from './dto/comments-list-response.dto';
 
 @Injectable()
 export class CommentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getLatestComments(limit = 20) {
-    const comments = await this.prisma.comment.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            profilePictureUrl: true,
+  async getLatestComments(query: GetCommentsQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const [comments, total] = await this.prisma.$transaction([
+      this.prisma.comment.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              profilePictureUrl: true,
+            },
           },
         },
-      },
-    });
+      }),
+      this.prisma.comment.count(),
+    ]);
 
-    return comments.map((comment) => new CommentResponseDto(comment));
+    return new CommentsListResponseDto({
+      data: comments.map((comment) => new CommentResponseDto(comment)),
+      total,
+      page,
+      limit,
+    });
   }
 
   async getCommentById(id: string) {
@@ -52,24 +67,38 @@ export class CommentsService {
     return new CommentResponseDto(comment);
   }
 
-  async getMovieComments(movieId: string) {
-    const comments = await this.prisma.comment.findMany({
-      where: { movieId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            profilePictureUrl: true,
+  async getMovieComments(movieId: string, query: GetCommentsQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const [comments, total] = await this.prisma.$transaction([
+      this.prisma.comment.findMany({
+        where: { movieId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              profilePictureUrl: true,
+            },
           },
         },
-      },
-    });
+      }),
+      this.prisma.comment.count({ where: { movieId } }),
+    ]);
 
-    return comments.map((comment) => new CommentResponseDto(comment));
+    return new CommentsListResponseDto({
+      data: comments.map((comment) => new CommentResponseDto(comment)),
+      total,
+      page,
+      limit,
+    });
   }
 
   async createComment(createCommentDto: CreateCommentDto, userId: string) {

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -18,6 +18,8 @@ import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CommentResponseDto } from './dto/comment-response.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
+import { GetCommentsQueryDto } from './dto/get-comments-query.dto';
+import { CommentsListResponseDto } from './dto/comments-list-response.dto';
 
 @ApiTags('comments')
 @UseGuards(JwtAuthGuard)
@@ -27,10 +29,10 @@ export class CommentsController {
 
   @Get()
   @ApiOperation({ summary: 'Get latest comments' })
-  @ApiOkResponse({ type: [CommentResponseDto] })
+  @ApiOkResponse({ type: CommentsListResponseDto })
   @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
-  getLatestComments() {
-    return this.commentsService.getLatestComments();
+  getLatestComments(@Query() query: GetCommentsQueryDto) {
+    return this.commentsService.getLatestComments(query);
   }
 
   @Get(':id')
