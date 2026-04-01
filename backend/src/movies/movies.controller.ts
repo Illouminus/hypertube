@@ -71,4 +71,21 @@ export class MoviesController {
         this.moviesCronService.fetchAndCacheJackettMovies();
         return { message: 'Jackett scraping started in background!' };
     }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('cleanup-library')
+    @ApiOperation({ summary: 'Trigger stale library cleanup manually' })
+    @ApiOkResponse({
+        schema: {
+            type: 'object',
+            properties: {
+                message: { type: 'string', example: 'Library cleanup finished successfully.' },
+            },
+        },
+    })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    async cleanupLibrary() {
+        await this.moviesCronService.cleanupStaleLibrary();
+        return { message: 'Library cleanup finished successfully.' };
+    }
 }

@@ -156,6 +156,37 @@ describe('MoviesCronService', () => {
     );
   });
 
+  it('rejects low-availability torrents during quality control', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'JACKETT_URL') return 'http://jackett';
+      if (key === 'JACKETT_API_KEY') return 'secret';
+      if (key === 'TMDB_API_TOKEN') return undefined;
+      return undefined;
+    });
+
+    httpService.get.mockReturnValue(
+      of({
+        data: {
+          Results: [
+            {
+              Imdb: 133093,
+              MagnetUri: 'magnet:?xt=urn:btih:AAA111',
+              Title: 'The Matrix 1080p',
+              Size: 1024 * 1024 * 700,
+              Seeders: 1,
+              Peers: 0,
+            },
+          ],
+        },
+      }),
+    );
+
+    await service.fetchAndCacheJackettMovies();
+
+    expect(prisma.movie.upsert).not.toHaveBeenCalled();
+    expect(prisma.torrent.upsert).not.toHaveBeenCalled();
+  });
+
   it('fetches TMDb details and stores genres, cast, director and runtime', async () => {
     configService.get.mockImplementation((key: string) => {
       if (key === 'JACKETT_URL') return 'http://jackett';

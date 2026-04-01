@@ -6,7 +6,7 @@ import { MoviesCronService } from './movies-cron/movies-cron.service';
 describe('MoviesController', () => {
   let controller: MoviesController;
   let moviesService: { getMovies: jest.Mock; getMovieById: jest.Mock; recordView: jest.Mock };
-  let moviesCronService: { fetchAndCacheJackettMovies: jest.Mock };
+  let moviesCronService: { fetchAndCacheJackettMovies: jest.Mock; cleanupStaleLibrary: jest.Mock };
 
   beforeEach(async () => {
     moviesService = {
@@ -16,6 +16,7 @@ describe('MoviesController', () => {
     };
     moviesCronService = {
       fetchAndCacheJackettMovies: jest.fn(),
+      cleanupStaleLibrary: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -51,6 +52,13 @@ describe('MoviesController', () => {
       message: 'Jackett scraping started in background!',
     });
     expect(moviesCronService.fetchAndCacheJackettMovies).toHaveBeenCalledTimes(1);
+  });
+
+  it('triggers cleanup endpoint', async () => {
+    await expect(controller.cleanupLibrary()).resolves.toEqual({
+      message: 'Library cleanup finished successfully.',
+    });
+    expect(moviesCronService.cleanupStaleLibrary).toHaveBeenCalledTimes(1);
   });
 
   it('returns one movie by id', async () => {

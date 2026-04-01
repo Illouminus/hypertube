@@ -11,6 +11,8 @@ import { extname } from 'node:path';
 export class MoviesCronService {
     private readonly logger = new Logger(MoviesCronService.name);
     private readonly requestTimeoutMs = 10_000;
+    private readonly minSeeders = 3;
+    private readonly minPeers = 1;
 
     constructor(
         private readonly httpService: HttpService,
@@ -98,22 +100,105 @@ export class MoviesCronService {
 
             this.logger.log(`Found ${results.length} torrents. Processing metadata...`);
 
+            const qualityStats = {
+                rejectedMissingCore: 0,
+                rejectedInvalidImdb: 0,
+                rejectedInvalidHash: 0,
+                rejectedLowAvailability: 0,
+                deduplicated: 0,
+            };
+            const candidates = new Map<
+                string,
+                {
+                    title: string;
+                    imdbId: string;
+                    hash: string;
+                    magnet: string;
+                    quality: string;
+                    size: string;
+                    seeds: number;
+                    peers: number;
+                }
+            >();
+
+            for (const item of results) {
+                if (!item?.Imdb || !item?.MagnetUri) {
+                    qualityStats.rejectedMissingCore += 1;
+                    continue;
+                }
+
+                const title = typeof item.Title === 'string' ? item.Title : 'Unknown title';
+                const imdbId = this.normalizeImdbId(item.Imdb);
+                if (!imdbId) {
+                    qualityStats.rejectedInvalidImdb += 1;
+                    continue;
+                }
+
+                if (typeof item.MagnetUri !== 'string') {
+                    qualityStats.rejectedInvalidHash += 1;
+                    continue;
+                }
+
+                const hash = this.extractHash(item.MagnetUri);
+                if (!hash) {
+                    qualityStats.rejectedInvalidHash += 1;
+                    continue;
+                }
+
+                const seeds = this.toNonNegativeInt(item.Seeders);
+                const peers = this.toNonNegativeInt(item.Peers);
+                if (seeds < this.minSeeders || peers < this.minPeers) {
+                    qualityStats.rejectedLowAvailability += 1;
+                    continue;
+                }
+
+                const quality = this.detectQuality(title);
+                const dedupKey = `${imdbId}:${quality}`;
+
+                const nextCandidate = {
+                    title,
+                    imdbId,
+                    hash,
+                    magnet: item.MagnetUri,
+                    quality,
+                    size: this.formatSize(item.Size),
+                    seeds,
+                    peers,
+                };
+
+                const currentCandidate = candidates.get(dedupKey);
+                if (!currentCandidate) {
+                    candidates.set(dedupKey, nextCandidate);
+                    continue;
+                }
+
+                qualityStats.deduplicated += 1;
+                if (this.isBetterCandidate(nextCandidate, currentCandidate)) {
+                    candidates.set(dedupKey, nextCandidate);
+                }
+            }
+
+            const preparedCandidates = [...candidates.values()];
+            if (preparedCandidates.length === 0) {
+                this.logger.warn(
+                    `No acceptable torrents after quality control. Rejected: missing_core=${qualityStats.rejectedMissingCore}, invalid_imdb=${qualityStats.rejectedInvalidImdb}, invalid_hash=${qualityStats.rejectedInvalidHash}, low_availability=${qualityStats.rejectedLowAvailability}`,
+                );
+                return;
+            }
+
+            this.logger.log(
+                `Quality control: accepted=${preparedCandidates.length}, deduplicated=${qualityStats.deduplicated}, rejected_missing_core=${qualityStats.rejectedMissingCore}, rejected_invalid_imdb=${qualityStats.rejectedInvalidImdb}, rejected_invalid_hash=${qualityStats.rejectedInvalidHash}, rejected_low_availability=${qualityStats.rejectedLowAvailability}`,
+            );
+
             // Cache movies by IMDb ID to avoid duplicate DB/TMDb work in one run.
             const movieByImdb = new Map<string, Awaited<ReturnType<PrismaService['movie']['findUnique']>>>();
             let enrichedFromTmdbCount = 0;
             let fallbackMovieCreatedCount = 0;
             let skippedInvalidItemCount = 0;
 
-            for (const item of results) {
+            for (const candidate of preparedCandidates) {
                 try {
-                    if (!item?.Imdb || !item?.MagnetUri) continue;
-
-                    const title = typeof item.Title === 'string' ? item.Title : 'Unknown title';
-                    const imdbId = this.normalizeImdbId(item.Imdb);
-                    if (!imdbId) continue;
-
-                    const hash = this.extractHash(item.MagnetUri);
-                    if (!hash) continue;
+                    const { title, imdbId, hash } = candidate;
 
                     let movie = movieByImdb.get(imdbId);
                     if (movie === undefined) {
@@ -208,20 +293,20 @@ export class MoviesCronService {
                     await this.prisma.torrent.upsert({
                         where: { hash },
                         update: {
-                            magnet: item.MagnetUri,
-                            quality: this.detectQuality(title),
-                            size: this.formatSize(item.Size),
-                            seeds: this.toNonNegativeInt(item.Seeders),
-                            peers: this.toNonNegativeInt(item.Peers),
+                            magnet: candidate.magnet,
+                            quality: candidate.quality,
+                            size: candidate.size,
+                            seeds: candidate.seeds,
+                            peers: candidate.peers,
                             movieId: movie.id,
                         },
                         create: {
                             hash,
-                            magnet: item.MagnetUri,
-                            quality: this.detectQuality(title),
-                            size: this.formatSize(item.Size),
-                            seeds: this.toNonNegativeInt(item.Seeders),
-                            peers: this.toNonNegativeInt(item.Peers),
+                            magnet: candidate.magnet,
+                            quality: candidate.quality,
+                            size: candidate.size,
+                            seeds: candidate.seeds,
+                            peers: candidate.peers,
                             movieId: movie.id,
                         },
                     });
@@ -339,6 +424,17 @@ export class MoviesCronService {
         if (normalizedTitle.includes('720p')) return '720p';
         if (normalizedTitle.includes('3d')) return '3D';
         return 'Unknown';
+    }
+
+    private isBetterCandidate(
+        nextCandidate: { seeds: number; peers: number },
+        currentCandidate: { seeds: number; peers: number },
+    ): boolean {
+        if (nextCandidate.seeds !== currentCandidate.seeds) {
+            return nextCandidate.seeds > currentCandidate.seeds;
+        }
+
+        return nextCandidate.peers > currentCandidate.peers;
     }
 
     private formatSize(sizeInBytes: unknown): string {
