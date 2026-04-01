@@ -28,6 +28,30 @@ services:
     ports:
       - "${ADMINER_PORT}:8080"
 
+  transmission:
+    image: linuxserver/transmission:latest
+    container_name: hypertube_transmission
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=Europe/Paris
+      - USER=${TRANSMISSION_USER:-admin}
+      - PASS=${TRANSMISSION_PASS:-admin}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9091/transmission/web/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    ports:
+      - "${TRANSMISSION_PORT:-9091}:9091"
+      - "51413:51413"
+      - "51413:51413/udp"
+    volumes:
+      - ./downloads:/downloads
+      - transmission_config:/config
+
   jackett:
     image: linuxserver/jackett:latest
     container_name: hypertube_jackett
@@ -51,3 +75,4 @@ services:
 
 volumes:
   postgres_data:
+  transmission_config:
