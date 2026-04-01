@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
 import { MoviesModule } from './movies/movies.module';
 import { CommentsModule } from './comments/comments.module';
+import { TorrentModule } from './torrent/torrent.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CommentsModule } from './comments/comments.module';
     MailModule,
     MoviesModule,
     CommentsModule,
+    TorrentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
