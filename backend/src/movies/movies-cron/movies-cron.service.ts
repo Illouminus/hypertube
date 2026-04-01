@@ -7,6 +7,14 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { rm } from 'node:fs/promises';
 import { extname } from 'node:path';
 
+type CleanupStats = {
+    moviesFound: number;
+    moviesDeleted: number;
+    mediaDeleteAttempts: number;
+    mediaDeleteSucceeded: number;
+    mediaDeleteFailed: number;
+};
+
 @Injectable()
 export class MoviesCronService {
     private readonly logger = new Logger(MoviesCronService.name);
@@ -22,6 +30,14 @@ export class MoviesCronService {
 
     @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
     async cleanupStaleLibrary() {
+        const stats: CleanupStats = {
+            moviesFound: 0,
+            moviesDeleted: 0,
+            mediaDeleteAttempts: 0,
+            mediaDeleteSucceeded: 0,
+            mediaDeleteFailed: 0,
+        };
+
         const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
         const cutoffDate = new Date(Date.now() - thirtyDaysInMs);
 
@@ -41,14 +57,19 @@ export class MoviesCronService {
             },
         });
 
+        stats.moviesFound = staleMovies.length;
+
         if (staleMovies.length === 0) {
             this.logger.log('Library cleanup: no stale movies found.');
-            return;
+            return stats;
         }
 
         for (const movie of staleMovies) {
             for (const torrent of movie.torrents) {
-                await this.deleteLocalMediaArtifacts(torrent.filePath);
+                const result = await this.deleteLocalMediaArtifacts(torrent.filePath);
+                stats.mediaDeleteAttempts += result.attempts;
+                stats.mediaDeleteSucceeded += result.succeeded;
+                stats.mediaDeleteFailed += result.failed;
             }
         }
 
@@ -58,8 +79,12 @@ export class MoviesCronService {
                 id: { in: staleMovieIds },
             },
         });
+        stats.moviesDeleted = staleMovieIds.length;
 
-        this.logger.log(`Library cleanup: deleted ${staleMovieIds.length} stale movie(s).`);
+        this.logger.log(
+            `Library cleanup: deleted_movies=${stats.moviesDeleted}, media_delete_attempts=${stats.mediaDeleteAttempts}, media_delete_succeeded=${stats.mediaDeleteSucceeded}, media_delete_failed=${stats.mediaDeleteFailed}`,
+        );
+        return stats;
     }
 
     // @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT) // After testing, you can uncomment this line to run the job every day at midnight
@@ -458,25 +483,51 @@ export class MoviesCronService {
         return String(error);
     }
 
-    private async deleteLocalMediaArtifacts(filePath: string | null): Promise<void> {
-        if (!filePath) return;
+    private async deleteLocalMediaArtifacts(filePath: string | null): Promise<{ attempts: number; succeeded: number; failed: number }> {
+        if (!filePath) return { attempts: 0, succeeded: 0, failed: 0 };
 
-        await this.safeRemove(filePath);
+        let attempts = 0;
+        let succeeded = 0;
+        let failed = 0;
+
+        attempts += 1;
+        if (await this.safeRemove(filePath)) {
+            succeeded += 1;
+        } else {
+            failed += 1;
+        }
 
         const extension = extname(filePath);
-        if (!extension) return;
+        if (!extension) {
+            return { attempts, succeeded, failed };
+        }
 
         // Try common subtitle extensions generated near the video file.
         const basePath = filePath.slice(0, -extension.length);
-        await this.safeRemove(`${basePath}.srt`);
-        await this.safeRemove(`${basePath}.vtt`);
+        attempts += 1;
+        if (await this.safeRemove(`${basePath}.srt`)) {
+            succeeded += 1;
+        } else {
+            failed += 1;
+        }
+
+        attempts += 1;
+        if (await this.safeRemove(`${basePath}.vtt`)) {
+            succeeded += 1;
+        } else {
+            failed += 1;
+        }
+
+        return { attempts, succeeded, failed };
     }
 
-    private async safeRemove(targetPath: string): Promise<void> {
+    private async safeRemove(targetPath: string): Promise<boolean> {
         try {
             await rm(targetPath, { force: true });
+            return true;
         } catch (error) {
             this.logger.warn(`Library cleanup: failed to remove ${targetPath}: ${this.extractErrorMessage(error)}`);
+            return false;
         }
     }
 }

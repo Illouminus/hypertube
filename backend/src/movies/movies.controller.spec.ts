@@ -55,8 +55,18 @@ describe('MoviesController', () => {
   });
 
   it('triggers cleanup endpoint', async () => {
+    const stats = {
+      moviesFound: 2,
+      moviesDeleted: 2,
+      mediaDeleteAttempts: 6,
+      mediaDeleteSucceeded: 6,
+      mediaDeleteFailed: 0,
+    };
+    moviesCronService.cleanupStaleLibrary.mockResolvedValue(stats);
+
     await expect(controller.cleanupLibrary()).resolves.toEqual({
       message: 'Library cleanup finished successfully.',
+      stats,
     });
     expect(moviesCronService.cleanupStaleLibrary).toHaveBeenCalledTimes(1);
   });

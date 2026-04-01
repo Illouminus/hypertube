@@ -80,12 +80,25 @@ export class MoviesController {
             type: 'object',
             properties: {
                 message: { type: 'string', example: 'Library cleanup finished successfully.' },
+                stats: {
+                    type: 'object',
+                    properties: {
+                        moviesFound: { type: 'number', example: 12 },
+                        moviesDeleted: { type: 'number', example: 12 },
+                        mediaDeleteAttempts: { type: 'number', example: 36 },
+                        mediaDeleteSucceeded: { type: 'number', example: 35 },
+                        mediaDeleteFailed: { type: 'number', example: 1 },
+                    },
+                },
             },
         },
     })
     @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
     async cleanupLibrary() {
-        await this.moviesCronService.cleanupStaleLibrary();
-        return { message: 'Library cleanup finished successfully.' };
+        const stats = await this.moviesCronService.cleanupStaleLibrary();
+        return {
+            message: 'Library cleanup finished successfully.',
+            stats,
+        };
     }
 }

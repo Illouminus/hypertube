@@ -279,9 +279,16 @@ describe('MoviesCronService', () => {
   it('does not delete anything when no stale movies found', async () => {
     prisma.movie.findMany.mockResolvedValue([]);
 
-    await service.cleanupStaleLibrary();
+    const result = await service.cleanupStaleLibrary();
 
     expect(prisma.movie.deleteMany).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      moviesFound: 0,
+      moviesDeleted: 0,
+      mediaDeleteAttempts: 0,
+      mediaDeleteSucceeded: 0,
+      mediaDeleteFailed: 0,
+    });
   });
 
   it('deletes stale movies from database', async () => {
@@ -297,12 +304,19 @@ describe('MoviesCronService', () => {
     ]);
     prisma.movie.deleteMany.mockResolvedValue({ count: 2 });
 
-    await service.cleanupStaleLibrary();
+    const result = await service.cleanupStaleLibrary();
 
     expect(prisma.movie.deleteMany).toHaveBeenCalledWith({
       where: {
         id: { in: ['movie-1', 'movie-2'] },
       },
+    });
+    expect(result).toEqual({
+      moviesFound: 2,
+      moviesDeleted: 2,
+      mediaDeleteAttempts: 0,
+      mediaDeleteSucceeded: 0,
+      mediaDeleteFailed: 0,
     });
   });
 });
