@@ -3,6 +3,9 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { rm } from 'node:fs/promises';
+import { extname } from 'node:path';
 
 @Injectable()
 export class MoviesCronService {
@@ -14,6 +17,48 @@ export class MoviesCronService {
         private readonly prisma: PrismaService,
         private readonly configService: ConfigService,
     ) {}
+
+    @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+    async cleanupStaleLibrary() {
+        const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+        const cutoffDate = new Date(Date.now() - thirtyDaysInMs);
+
+        const staleMovies = await this.prisma.movie.findMany({
+            where: {
+                OR: [
+                    { lastViewedAt: { lt: cutoffDate } },
+                    { lastViewedAt: null, createdAt: { lt: cutoffDate } },
+                ],
+            },
+            include: {
+                torrents: {
+                    select: {
+                        filePath: true,
+                    },
+                },
+            },
+        });
+
+        if (staleMovies.length === 0) {
+            this.logger.log('Library cleanup: no stale movies found.');
+            return;
+        }
+
+        for (const movie of staleMovies) {
+            for (const torrent of movie.torrents) {
+                await this.deleteLocalMediaArtifacts(torrent.filePath);
+            }
+        }
+
+        const staleMovieIds = staleMovies.map((movie) => movie.id);
+        await this.prisma.movie.deleteMany({
+            where: {
+                id: { in: staleMovieIds },
+            },
+        });
+
+        this.logger.log(`Library cleanup: deleted ${staleMovieIds.length} stale movie(s).`);
+    }
 
     // @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT) // After testing, you can uncomment this line to run the job every day at midnight
     async fetchAndCacheJackettMovies() {
@@ -315,5 +360,27 @@ export class MoviesCronService {
     private extractErrorMessage(error: unknown): string {
         if (error instanceof Error) return error.message;
         return String(error);
+    }
+
+    private async deleteLocalMediaArtifacts(filePath: string | null): Promise<void> {
+        if (!filePath) return;
+
+        await this.safeRemove(filePath);
+
+        const extension = extname(filePath);
+        if (!extension) return;
+
+        // Try common subtitle extensions generated near the video file.
+        const basePath = filePath.slice(0, -extension.length);
+        await this.safeRemove(`${basePath}.srt`);
+        await this.safeRemove(`${basePath}.vtt`);
+    }
+
+    private async safeRemove(targetPath: string): Promise<void> {
+        try {
+            await rm(targetPath, { force: true });
+        } catch (error) {
+            this.logger.warn(`Library cleanup: failed to remove ${targetPath}: ${this.extractErrorMessage(error)}`);
+        }
     }
 }

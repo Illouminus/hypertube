@@ -5,7 +5,7 @@ import { MoviesCronService } from './movies-cron/movies-cron.service';
 
 describe('MoviesController', () => {
   let controller: MoviesController;
-  let moviesService: { getMovies: jest.Mock; getMovieById: jest.Mock };
+  let moviesService: { getMovies: jest.Mock; getMovieById: jest.Mock; recordView: jest.Mock };
   let moviesCronService: { fetchAndCacheJackettMovies: jest.Mock };
 
   beforeEach(async () => {
@@ -35,14 +35,15 @@ describe('MoviesController', () => {
 
   it('returns filtered movies from service', async () => {
     const filters = { search: 'matrix', page: 2, limit: 10 };
+    const user = { id: 'user-123' };
     const response = {
       data: [],
       meta: { total: 0, page: 2, limit: 10, totalPages: 0 },
     };
     moviesService.getMovies.mockResolvedValue(response);
 
-    await expect(controller.getMovies(filters)).resolves.toEqual(response);
-    expect(moviesService.getMovies).toHaveBeenCalledWith(filters);
+    await expect(controller.getMovies(filters, user as any)).resolves.toEqual(response);
+    expect(moviesService.getMovies).toHaveBeenCalledWith(filters, user.id);
   });
 
   it('triggers scraper endpoint', async () => {

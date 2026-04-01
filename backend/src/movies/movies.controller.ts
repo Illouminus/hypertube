@@ -25,9 +25,11 @@ export class MoviesController {
         description: 'Invalid query parameters or invalid year range',
         type: ErrorResponseDto,
     })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    @UseGuards(JwtAuthGuard)
     @Get()
-    async getMovies(@Query() filters: GetMoviesFilterDto) {
-        return this.moviesService.getMovies(filters);
+    async getMovies(@Query() filters: GetMoviesFilterDto, @CurrentUser() user: UserEntity) {
+        return this.moviesService.getMovies(filters, user.id);
     }
 
     @ApiOperation({ summary: 'Get one movie by id' })

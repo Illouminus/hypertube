@@ -10,7 +10,7 @@ describe('MoviesCronService', () => {
   let httpService: { get: jest.Mock };
   let configService: { get: jest.Mock };
   let prisma: {
-    movie: { findUnique: jest.Mock; upsert: jest.Mock };
+    movie: { findUnique: jest.Mock; upsert: jest.Mock; findMany: jest.Mock; deleteMany: jest.Mock };
     torrent: { upsert: jest.Mock };
   };
 
@@ -21,6 +21,8 @@ describe('MoviesCronService', () => {
       movie: {
         findUnique: jest.fn(),
         upsert: jest.fn(),
+        findMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
       torrent: {
         upsert: jest.fn(),
@@ -241,5 +243,35 @@ describe('MoviesCronService', () => {
         }),
       }),
     );
+  });
+
+  it('does not delete anything when no stale movies found', async () => {
+    prisma.movie.findMany.mockResolvedValue([]);
+
+    await service.cleanupStaleLibrary();
+
+    expect(prisma.movie.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('deletes stale movies from database', async () => {
+    prisma.movie.findMany.mockResolvedValue([
+      {
+        id: 'movie-1',
+        torrents: [{ filePath: null }],
+      },
+      {
+        id: 'movie-2',
+        torrents: [{ filePath: null }],
+      },
+    ]);
+    prisma.movie.deleteMany.mockResolvedValue({ count: 2 });
+
+    await service.cleanupStaleLibrary();
+
+    expect(prisma.movie.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['movie-1', 'movie-2'] },
+      },
+    });
   });
 });

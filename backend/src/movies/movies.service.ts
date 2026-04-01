@@ -10,7 +10,7 @@ import { RecordViewDto } from './dto/record-view.dto';
 export class MoviesService {
 	constructor(private readonly prisma: PrismaService) {}
 
-	async getMovies(filters: GetMoviesFilterDto) {
+	async getMovies(filters: GetMoviesFilterDto, userId: string) {
 		if (
 			filters.yearMin !== undefined &&
 			filters.yearMax !== undefined &&
@@ -49,7 +49,10 @@ export class MoviesService {
 
 		const sortBy = filters.sortBy ?? MoviesSortBy.RATING;
 		const sortOrder: Prisma.SortOrder = (filters.sortOrder ?? SortOrder.DESC) as Prisma.SortOrder;
-		const orderBy: Prisma.MovieOrderByWithRelationInput = { [sortBy]: sortOrder };
+		const orderBy: Prisma.MovieOrderByWithRelationInput | Prisma.MovieOrderByWithRelationInput[] =
+			filters.sortBy || filters.search
+				? { [sortBy]: sortOrder }
+				: [{ torrents: { _count: 'desc' } }, { rating: 'desc' }];
 
 		const [data, total] = await this.prisma.$transaction([
 			this.prisma.movie.findMany({
@@ -59,6 +62,10 @@ export class MoviesService {
 				take: limit,
 				include: {
 					torrents: true,
+					movieViews: {
+						where: { userId },
+						select: { id: true },
+					},
 				},
 			}),
 			this.prisma.movie.count({ where }),

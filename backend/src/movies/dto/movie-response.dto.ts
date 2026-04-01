@@ -5,6 +5,19 @@ export type MovieWithTorrents = Prisma.MovieGetPayload<{
   include: { torrents: true };
 }>;
 
+export type MovieWithTorrentsAndViews = Prisma.MovieGetPayload<{
+  include: {
+    torrents: true;
+    movieViews: {
+      select: {
+        id: true;
+      };
+    };
+  };
+}>;
+
+type MovieListItem = MovieWithTorrents | MovieWithTorrentsAndViews;
+
 export class TorrentResponseDto {
   @ApiProperty()
   hash: string;
@@ -60,8 +73,14 @@ export class MovieResponseDto {
   updatedAt: Date;
   @ApiProperty({ type: [TorrentResponseDto] })
   torrents: TorrentResponseDto[];
+  @ApiProperty({
+    description: 'Whether the current user has watched this movie',
+    example: true,
+    default: false,
+  })
+  isWatched: boolean;
 
-  constructor(movie: MovieWithTorrents) {
+  constructor(movie: MovieListItem) {
     this.id = movie.id;
     this.imdbId = movie.imdbId;
     this.title = movie.title;
@@ -77,6 +96,7 @@ export class MovieResponseDto {
     this.createdAt = movie.createdAt;
     this.updatedAt = movie.updatedAt;
     this.torrents = (movie.torrents ?? []).map((torrent) => new TorrentResponseDto(torrent));
+    this.isWatched = 'movieViews' in movie ? (movie.movieViews?.length ?? 0) > 0 : Boolean(movie.lastViewedAt);
   }
 }
 
@@ -100,7 +120,7 @@ export class MoviesListResponseDto {
   };
 
   constructor(params: {
-    data: MovieWithTorrents[];
+    data: MovieListItem[];
     total: number;
     page: number;
     limit: number;

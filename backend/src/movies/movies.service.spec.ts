@@ -48,14 +48,21 @@ describe('MoviesService', () => {
     prisma.movie.count.mockReturnValue('countCall');
     prisma.$transaction.mockResolvedValue([[], 0]);
 
-    const result = await service.getMovies({});
+    const result = await service.getMovies({}, 'user-id-123');
 
     expect(prisma.movie.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {},
-        orderBy: { rating: 'desc' },
+        orderBy: [{ torrents: { _count: 'desc' } }, { rating: 'desc' }],
         skip: 0,
         take: 20,
+        include: {
+          torrents: true,
+          movieViews: {
+            where: { userId: 'user-id-123' },
+            select: { id: true },
+          },
+        },
       }),
     );
     expect(prisma.movie.count).toHaveBeenCalledWith({ where: {} });
@@ -86,7 +93,7 @@ describe('MoviesService', () => {
       sortOrder: SortOrder.ASC,
       page: 2,
       limit: 10,
-    });
+    }, 'user-id-123');
 
     expect(prisma.movie.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -102,6 +109,13 @@ describe('MoviesService', () => {
         orderBy: { year: 'asc' },
         skip: 10,
         take: 10,
+        include: {
+          torrents: true,
+          movieViews: {
+            where: { userId: 'user-id-123' },
+            select: { id: true },
+          },
+        },
       }),
     );
     expect(result.meta).toEqual({
@@ -115,6 +129,44 @@ describe('MoviesService', () => {
       expect.objectContaining({
         id: '1',
         torrents: [],
+        isWatched: false,
+      }),
+    );
+  });
+
+  it('sets isWatched to true when current user has viewed movie', async () => {
+    prisma.movie.findMany.mockReturnValue('findManyCall');
+    prisma.movie.count.mockReturnValue('countCall');
+    prisma.$transaction.mockResolvedValue([
+      [
+        {
+          id: 'movie-1',
+          imdbId: 'tt0133093',
+          title: 'The Matrix',
+          year: 1999,
+          rating: 8.7,
+          runtime: 136,
+          genres: ['Action'],
+          summary: 'A hacker discovers reality.',
+          coverImageUrl: 'https://example.com/poster.jpg',
+          director: 'Lana Wachowski',
+          cast: ['Keanu Reeves'],
+          lastViewedAt: null,
+          createdAt: new Date('2026-03-24T00:00:00.000Z'),
+          updatedAt: new Date('2026-03-24T00:00:00.000Z'),
+          torrents: [],
+          movieViews: [{ id: 'view-1' }],
+        },
+      ],
+      1,
+    ]);
+
+    const result = await service.getMovies({}, 'user-id-123');
+
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        id: 'movie-1',
+        isWatched: true,
       }),
     );
   });
