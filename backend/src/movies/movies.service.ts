@@ -5,10 +5,14 @@ import { GetMoviesFilterDto } from './dto/get-movies-filter.dto';
 import { MovieResponseDto, MoviesListResponseDto } from './dto/movie-response.dto';
 import { MoviesSortBy, SortOrder } from './dto/movies-sort.enum';
 import { RecordViewDto } from './dto/record-view.dto';
+import { SubtitlesService } from 'src/subtitles/subtitles.service';
 
 @Injectable()
 export class MoviesService {
-	constructor(private readonly prisma: PrismaService) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly subtitlesService: SubtitlesService,
+	) {}
 
 	async getMovies(filters: GetMoviesFilterDto, userId: string) {
 		if (
@@ -75,10 +79,15 @@ export class MoviesService {
 	}
 
 	async getMovieById(id: string) {
+		await this.subtitlesService.ensureSubtitlesForMovie(id);
+
 		const movie = await this.prisma.movie.findUnique({
 			where: { id },
 			include: {
 				torrents: true,
+				subtitles: {
+					orderBy: { languageCode: 'asc' },
+				},
 				comments: {
 					orderBy: { createdAt: 'desc' },
 					include: {

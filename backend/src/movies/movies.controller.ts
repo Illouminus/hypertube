@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import { MoviesCronService } from './movies-cron/movies-cron.service';
 import { MoviesService } from './movies.service';
 import { GetMoviesFilterDto } from './dto/get-movies-filter.dto';
@@ -24,6 +24,10 @@ import { CommentResponseDto } from 'src/comments/dto/comment-response.dto';
 import { CreateMovieCommentDto } from 'src/comments/dto/create-movie-comment.dto';
 import { GetCommentsQueryDto } from 'src/comments/dto/get-comments-query.dto';
 import { CommentsListResponseDto } from 'src/comments/dto/comments-list-response.dto';
+import { SubtitlesService } from 'src/subtitles/subtitles.service';
+import { SubtitleResponseDto } from 'src/subtitles/dto/subtitle-response.dto';
+import { createReadStream } from 'node:fs';
+import type { Response } from 'express';
 
 @ApiTags('movies')
 @Controller('movies')
@@ -33,6 +37,7 @@ export class MoviesController {
         private readonly moviesService: MoviesService,
         private readonly moviesCronService: MoviesCronService,
         private readonly commentsService: CommentsService,
+        private readonly subtitlesService: SubtitlesService,
     ) {}
 
     @ApiOperation({ summary: 'Get movies from local cache with filters' })
@@ -56,6 +61,37 @@ export class MoviesController {
     @Get(':id')
     async getMovieById(@Param('id', new ParseUUIDPipe()) id: string) {
         return this.moviesService.getMovieById(id);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get(':id/subtitles')
+    @ApiOperation({ summary: 'Get subtitles for one movie' })
+    @ApiParam({ name: 'id', description: 'Movie UUID' })
+    @ApiOkResponse({ type: [SubtitleResponseDto] })
+    @ApiBadRequestResponse({ description: 'Invalid movie id format (must be UUID)', type: ErrorResponseDto })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    async getMovieSubtitles(@Param('id', new ParseUUIDPipe()) movieId: string) {
+        await this.subtitlesService.ensureSubtitlesForMovie(movieId);
+        return this.subtitlesService.listSubtitles(movieId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get(':id/subtitles/:subtitleId/file')
+    @ApiOperation({ summary: 'Get subtitle file content (VTT)' })
+    @ApiParam({ name: 'id', description: 'Movie UUID' })
+    @ApiParam({ name: 'subtitleId', description: 'Subtitle UUID' })
+    @ApiBadRequestResponse({ description: 'Invalid id format', type: ErrorResponseDto })
+    @ApiNotFoundResponse({ description: 'Subtitle file not found', type: ErrorResponseDto })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    async getSubtitleFile(
+        @Param('id', new ParseUUIDPipe()) movieId: string,
+        @Param('subtitleId', new ParseUUIDPipe()) subtitleId: string,
+        @Res({ passthrough: true }) res: Response,
+    ) {
+        const filePath = await this.subtitlesService.getSubtitleFilePath(movieId, subtitleId);
+        res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return new StreamableFile(createReadStream(filePath));
     }
 
     @UseGuards(JwtAuthGuard)

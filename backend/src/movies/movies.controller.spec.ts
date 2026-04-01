@@ -3,12 +3,14 @@ import { MoviesController } from './movies.controller';
 import { MoviesService } from './movies.service';
 import { MoviesCronService } from './movies-cron/movies-cron.service';
 import { CommentsService } from 'src/comments/comments.service';
+import { SubtitlesService } from 'src/subtitles/subtitles.service';
 
 describe('MoviesController', () => {
   let controller: MoviesController;
   let moviesService: { getMovies: jest.Mock; getMovieById: jest.Mock; recordView: jest.Mock };
   let moviesCronService: { fetchAndCacheJackettMovies: jest.Mock; cleanupStaleLibrary: jest.Mock };
   let commentsService: { getMovieComments: jest.Mock; createCommentForMovie: jest.Mock };
+  let subtitlesService: { ensureSubtitlesForMovie: jest.Mock; listSubtitles: jest.Mock; getSubtitleFilePath: jest.Mock };
 
   beforeEach(async () => {
     moviesService = {
@@ -24,6 +26,11 @@ describe('MoviesController', () => {
       getMovieComments: jest.fn(),
       createCommentForMovie: jest.fn(),
     };
+    subtitlesService = {
+      ensureSubtitlesForMovie: jest.fn(),
+      listSubtitles: jest.fn(),
+      getSubtitleFilePath: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MoviesController],
@@ -31,6 +38,7 @@ describe('MoviesController', () => {
         { provide: MoviesService, useValue: moviesService },
         { provide: MoviesCronService, useValue: moviesCronService },
         { provide: CommentsService, useValue: commentsService },
+        { provide: SubtitlesService, useValue: subtitlesService },
       ],
     }).compile();
 
@@ -126,5 +134,15 @@ describe('MoviesController', () => {
 
     await expect(controller.createMovieComment(movieId, dto, user as any)).resolves.toEqual(response);
     expect(commentsService.createCommentForMovie).toHaveBeenCalledWith(movieId, dto, user.id);
+  });
+
+  it('returns movie subtitles list', async () => {
+    const movieId = '91af3be9-d9d0-4e82-a347-3ece7624d6ea';
+    const response = [{ id: 'subtitle-1', languageCode: 'en', status: 'READY' }];
+    subtitlesService.listSubtitles.mockResolvedValue(response);
+
+    await expect(controller.getMovieSubtitles(movieId)).resolves.toEqual(response);
+    expect(subtitlesService.ensureSubtitlesForMovie).toHaveBeenCalledWith(movieId);
+    expect(subtitlesService.listSubtitles).toHaveBeenCalledWith(movieId);
   });
 });

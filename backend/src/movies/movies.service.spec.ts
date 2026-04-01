@@ -3,9 +3,11 @@ import { MoviesService } from './movies.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MoviesSortBy, SortOrder } from './dto/movies-sort.enum';
+import { SubtitlesService } from 'src/subtitles/subtitles.service';
 
 describe('MoviesService', () => {
   let service: MoviesService;
+  let subtitlesService: { ensureSubtitlesForMovie: jest.Mock };
   let prisma: {
     $transaction: jest.Mock;
     movie: {
@@ -16,6 +18,10 @@ describe('MoviesService', () => {
   };
 
   beforeEach(async () => {
+    subtitlesService = {
+      ensureSubtitlesForMovie: jest.fn().mockResolvedValue(undefined),
+    };
+
     prisma = {
       $transaction: jest.fn(),
       movie: {
@@ -33,6 +39,7 @@ describe('MoviesService', () => {
       providers: [
         MoviesService,
         { provide: PrismaService, useValue: prisma },
+        { provide: SubtitlesService, useValue: subtitlesService },
       ],
     }).compile();
 
@@ -201,15 +208,20 @@ describe('MoviesService', () => {
       createdAt: new Date('2026-03-24T00:00:00.000Z'),
       updatedAt: new Date('2026-03-24T00:00:00.000Z'),
       torrents: [],
+      subtitles: [],
       comments: [],
     });
 
     const result = await service.getMovieById('91af3be9-d9d0-4e82-a347-3ece7624d6ea');
 
+    expect(subtitlesService.ensureSubtitlesForMovie).toHaveBeenCalledWith('91af3be9-d9d0-4e82-a347-3ece7624d6ea');
     expect(prisma.movie.findUnique).toHaveBeenCalledWith({
       where: { id: '91af3be9-d9d0-4e82-a347-3ece7624d6ea' },
       include: {
         torrents: true,
+        subtitles: {
+          orderBy: { languageCode: 'asc' },
+        },
         comments: {
           orderBy: { createdAt: 'desc' },
           include: {

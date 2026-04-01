@@ -54,6 +54,11 @@ export class MoviesCronService {
                         filePath: true,
                     },
                 },
+                subtitles: {
+                    select: {
+                        filePath: true,
+                    },
+                },
             },
         });
 
@@ -70,6 +75,17 @@ export class MoviesCronService {
                 stats.mediaDeleteAttempts += result.attempts;
                 stats.mediaDeleteSucceeded += result.succeeded;
                 stats.mediaDeleteFailed += result.failed;
+            }
+
+            for (const subtitle of movie.subtitles ?? []) {
+                if (!subtitle.filePath) continue;
+                const deleted = await this.safeRemove(subtitle.filePath);
+                stats.mediaDeleteAttempts += 1;
+                if (deleted) {
+                    stats.mediaDeleteSucceeded += 1;
+                } else {
+                    stats.mediaDeleteFailed += 1;
+                }
             }
         }
 

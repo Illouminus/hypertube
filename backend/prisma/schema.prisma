@@ -13,6 +13,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum SubtitleStatus {
+  PENDING
+  READY
+  FAILED
+}
+
 
 // User model with fields for authentication, profile, and metadata. Password is optional for users authenticated via 42/Google.
 model User {
@@ -72,6 +78,7 @@ model Movie {
   torrents Torrent[] // Relationship to Torrent model
   movieViews MovieView[] // Relationship to MovieView model for tracking user views
   comments Comment[] // Relationship to Comment model
+  subtitles MovieSubtitle[]
 }
 
 
@@ -129,4 +136,22 @@ model Comment {
 
   @@index([movieId])
   @@index([userId])
+}
+
+model MovieSubtitle {
+  id                String         @id @default(uuid())
+  movieId            String
+  movie              Movie          @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  languageCode       String
+  format             String         @default("vtt")
+  provider           String?
+  providerSubtitleId String?
+  filePath           String?
+  status             SubtitleStatus @default(PENDING)
+  errorMessage       String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@unique([movieId, languageCode])
+  @@index([movieId])
 }

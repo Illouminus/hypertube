@@ -1,6 +1,7 @@
 import { Prisma } from '../../../generated/prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 import { CommentResponseDto } from 'src/comments/dto/comment-response.dto';
+import { SubtitleResponseDto } from 'src/subtitles/dto/subtitle-response.dto';
 
 export type MovieWithTorrents = Prisma.MovieGetPayload<{
   include: { torrents: true };
@@ -20,6 +21,7 @@ export type MovieWithTorrentsAndViews = Prisma.MovieGetPayload<{
 export type MovieWithDetails = Prisma.MovieGetPayload<{
   include: {
     torrents: true;
+    subtitles: true;
     comments: {
       include: {
         user: {
@@ -97,6 +99,8 @@ export class MovieResponseDto {
   comments: CommentResponseDto[];
   @ApiProperty({ example: 0 })
   commentsCount: number;
+  @ApiProperty({ type: [SubtitleResponseDto], default: [] })
+  subtitles: SubtitleResponseDto[];
   @ApiProperty({
     description: 'Whether the current user has watched this movie',
     example: true,
@@ -122,6 +126,7 @@ export class MovieResponseDto {
     this.torrents = (movie.torrents ?? []).map((torrent) => new TorrentResponseDto(torrent));
     this.comments = 'comments' in movie ? (movie.comments ?? []).map((comment) => new CommentResponseDto(comment)) : [];
     this.commentsCount = this.comments.length;
+    this.subtitles = 'subtitles' in movie ? (movie.subtitles ?? []).map((subtitle) => new SubtitleResponseDto(subtitle)) : [];
     this.isWatched = 'movieViews' in movie ? (movie.movieViews?.length ?? 0) > 0 : Boolean(movie.lastViewedAt);
   }
 }

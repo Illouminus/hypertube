@@ -4,9 +4,10 @@ import { MoviesController } from './movies.controller';
 import { MoviesService } from './movies.service';
 import { MoviesCronService } from './movies-cron/movies-cron.service';
 import { CommentsModule } from 'src/comments/comments.module';
+import { SubtitlesModule } from 'src/subtitles/subtitles.module';
 
 @Module({
-  imports: [HttpModule, CommentsModule],
+  imports: [HttpModule, CommentsModule, SubtitlesModule],
   controllers: [MoviesController],
   providers: [MoviesService, MoviesCronService]
 })
