@@ -18,7 +18,7 @@ export class SubtitlesService {
     private readonly configService: ConfigService,
   ) {}
 
-  async ensureSubtitlesForMovie(movieId: string, preferredLanguage?: string): Promise<void> {
+  async ensureSubtitlesForMovie(movieId: string, preferredLanguage?: string, forceRefresh = false): Promise<void> {
     const movie = await this.prisma.movie.findUnique({
       where: { id: movieId },
       include: { subtitles: true },
@@ -32,7 +32,7 @@ export class SubtitlesService {
 
     for (const languageCode of targetLanguages) {
       const existing = movie.subtitles.find((subtitle) => subtitle.languageCode === languageCode);
-      if (existing && (existing.status === SubtitleStatus.READY || existing.status === SubtitleStatus.PENDING)) {
+      if (!forceRefresh && existing && (existing.status === SubtitleStatus.READY || existing.status === SubtitleStatus.PENDING)) {
         continue;
       }
 
@@ -53,13 +53,23 @@ export class SubtitlesService {
     }
   }
 
-  async listSubtitles(movieId: string) {
+  async listSubtitles(movieId: string, preferredLanguage?: string) {
     const subtitles = await this.prisma.movieSubtitle.findMany({
       where: { movieId },
       orderBy: [{ status: 'asc' }, { languageCode: 'asc' }],
     });
 
-    return subtitles.map((subtitle) => new SubtitleResponseDto(subtitle));
+    const normalizedPreferred = (preferredLanguage ?? '').trim().toLowerCase();
+    const readySubtitles = subtitles.filter((subtitle) => subtitle.status === SubtitleStatus.READY);
+
+    const defaultSubtitle =
+      readySubtitles.find((subtitle) => subtitle.languageCode === normalizedPreferred) ??
+      readySubtitles.find((subtitle) => subtitle.languageCode === 'en') ??
+      readySubtitles[0];
+
+    return subtitles.map(
+      (subtitle) => new SubtitleResponseDto(subtitle, defaultSubtitle ? subtitle.id === defaultSubtitle.id : false),
+    );
   }
 
   async getSubtitleFilePath(movieId: string, subtitleId: string): Promise<string> {

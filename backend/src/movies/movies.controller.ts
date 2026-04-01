@@ -58,9 +58,11 @@ export class MoviesController {
     @ApiOkResponse({ type: MovieResponseDto })
     @ApiBadRequestResponse({ description: 'Invalid movie id format (must be UUID)', type: ErrorResponseDto })
     @ApiNotFoundResponse({ description: 'Movie not found', type: ErrorResponseDto })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    @UseGuards(JwtAuthGuard)
     @Get(':id')
-    async getMovieById(@Param('id', new ParseUUIDPipe()) id: string) {
-        return this.moviesService.getMovieById(id);
+    async getMovieById(@Param('id', new ParseUUIDPipe()) id: string, @CurrentUser() user: UserEntity) {
+        return this.moviesService.getMovieById(id, user.preferredLanguage);
     }
 
     @UseGuards(JwtAuthGuard)
@@ -70,9 +72,35 @@ export class MoviesController {
     @ApiOkResponse({ type: [SubtitleResponseDto] })
     @ApiBadRequestResponse({ description: 'Invalid movie id format (must be UUID)', type: ErrorResponseDto })
     @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
-    async getMovieSubtitles(@Param('id', new ParseUUIDPipe()) movieId: string) {
-        await this.subtitlesService.ensureSubtitlesForMovie(movieId);
-        return this.subtitlesService.listSubtitles(movieId);
+    async getMovieSubtitles(
+        @Param('id', new ParseUUIDPipe()) movieId: string,
+        @CurrentUser() user: UserEntity,
+    ) {
+        await this.subtitlesService.ensureSubtitlesForMovie(movieId, user.preferredLanguage);
+        return this.subtitlesService.listSubtitles(movieId, user.preferredLanguage);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post(':id/subtitles/refresh')
+    @ApiOperation({ summary: 'Force refresh subtitle download for one movie' })
+    @ApiParam({ name: 'id', description: 'Movie UUID' })
+    @ApiOkResponse({
+        schema: {
+            type: 'object',
+            properties: {
+                success: { type: 'boolean', example: true },
+                message: { type: 'string', example: 'Subtitle refresh has been started.' },
+            },
+        },
+    })
+    @ApiBadRequestResponse({ description: 'Invalid movie id format (must be UUID)', type: ErrorResponseDto })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    async refreshMovieSubtitles(
+        @Param('id', new ParseUUIDPipe()) movieId: string,
+        @CurrentUser() user: UserEntity,
+    ) {
+        await this.subtitlesService.ensureSubtitlesForMovie(movieId, user.preferredLanguage, true);
+        return { success: true, message: 'Subtitle refresh has been started.' };
     }
 
     @UseGuards(JwtAuthGuard)

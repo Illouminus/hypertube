@@ -78,8 +78,8 @@ export class MoviesService {
 		return new MoviesListResponseDto({ data, total, page, limit });
 	}
 
-	async getMovieById(id: string) {
-		await this.subtitlesService.ensureSubtitlesForMovie(id);
+	async getMovieById(id: string, preferredLanguage?: string) {
+		await this.subtitlesService.ensureSubtitlesForMovie(id, preferredLanguage);
 
 		const movie = await this.prisma.movie.findUnique({
 			where: { id },
@@ -109,7 +109,9 @@ export class MoviesService {
 			throw new NotFoundException(`Movie with id ${id} not found`);
 		}
 
-		return new MovieResponseDto(movie);
+		const dto = new MovieResponseDto(movie);
+		dto.subtitles = await this.subtitlesService.listSubtitles(id, preferredLanguage);
+		return dto;
 	}
 
 	async recordView(movieId: string, userId: string) {

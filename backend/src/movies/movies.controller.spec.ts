@@ -88,11 +88,12 @@ describe('MoviesController', () => {
 
   it('returns one movie by id', async () => {
     const movieId = '91af3be9-d9d0-4e82-a347-3ece7624d6ea';
+    const user = { id: 'user-123', preferredLanguage: 'fr' };
     const response = { id: movieId, title: 'The Matrix' };
     moviesService.getMovieById.mockResolvedValue(response);
 
-    await expect(controller.getMovieById(movieId)).resolves.toEqual(response);
-    expect(moviesService.getMovieById).toHaveBeenCalledWith(movieId);
+    await expect(controller.getMovieById(movieId, user as any)).resolves.toEqual(response);
+    expect(moviesService.getMovieById).toHaveBeenCalledWith(movieId, user.preferredLanguage);
   });
 
   it('records a movie view for authenticated user', async () => {
@@ -138,11 +139,23 @@ describe('MoviesController', () => {
 
   it('returns movie subtitles list', async () => {
     const movieId = '91af3be9-d9d0-4e82-a347-3ece7624d6ea';
+    const user = { id: 'user-123', preferredLanguage: 'fr' };
     const response = [{ id: 'subtitle-1', languageCode: 'en', status: 'READY' }];
     subtitlesService.listSubtitles.mockResolvedValue(response);
 
-    await expect(controller.getMovieSubtitles(movieId)).resolves.toEqual(response);
-    expect(subtitlesService.ensureSubtitlesForMovie).toHaveBeenCalledWith(movieId);
-    expect(subtitlesService.listSubtitles).toHaveBeenCalledWith(movieId);
+    await expect(controller.getMovieSubtitles(movieId, user as any)).resolves.toEqual(response);
+    expect(subtitlesService.ensureSubtitlesForMovie).toHaveBeenCalledWith(movieId, user.preferredLanguage);
+    expect(subtitlesService.listSubtitles).toHaveBeenCalledWith(movieId, user.preferredLanguage);
+  });
+
+  it('forces subtitle refresh for movie', async () => {
+    const movieId = '91af3be9-d9d0-4e82-a347-3ece7624d6ea';
+    const user = { id: 'user-123', preferredLanguage: 'fr' };
+
+    await expect(controller.refreshMovieSubtitles(movieId, user as any)).resolves.toEqual({
+      success: true,
+      message: 'Subtitle refresh has been started.',
+    });
+    expect(subtitlesService.ensureSubtitlesForMovie).toHaveBeenCalledWith(movieId, user.preferredLanguage, true);
   });
 });

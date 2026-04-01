@@ -7,7 +7,7 @@ import { SubtitlesService } from 'src/subtitles/subtitles.service';
 
 describe('MoviesService', () => {
   let service: MoviesService;
-  let subtitlesService: { ensureSubtitlesForMovie: jest.Mock };
+  let subtitlesService: { ensureSubtitlesForMovie: jest.Mock; listSubtitles: jest.Mock };
   let prisma: {
     $transaction: jest.Mock;
     movie: {
@@ -20,6 +20,7 @@ describe('MoviesService', () => {
   beforeEach(async () => {
     subtitlesService = {
       ensureSubtitlesForMovie: jest.fn().mockResolvedValue(undefined),
+      listSubtitles: jest.fn().mockResolvedValue([]),
     };
 
     prisma = {
@@ -212,9 +213,10 @@ describe('MoviesService', () => {
       comments: [],
     });
 
-    const result = await service.getMovieById('91af3be9-d9d0-4e82-a347-3ece7624d6ea');
+    const result = await service.getMovieById('91af3be9-d9d0-4e82-a347-3ece7624d6ea', 'fr');
 
-    expect(subtitlesService.ensureSubtitlesForMovie).toHaveBeenCalledWith('91af3be9-d9d0-4e82-a347-3ece7624d6ea');
+    expect(subtitlesService.ensureSubtitlesForMovie).toHaveBeenCalledWith('91af3be9-d9d0-4e82-a347-3ece7624d6ea', 'fr');
+    expect(subtitlesService.listSubtitles).toHaveBeenCalledWith('91af3be9-d9d0-4e82-a347-3ece7624d6ea', 'fr');
     expect(prisma.movie.findUnique).toHaveBeenCalledWith({
       where: { id: '91af3be9-d9d0-4e82-a347-3ece7624d6ea' },
       include: {
@@ -249,7 +251,7 @@ describe('MoviesService', () => {
   it('throws not found when movie id is missing', async () => {
     prisma.movie.findUnique.mockResolvedValue(null);
 
-    await expect(service.getMovieById('91af3be9-d9d0-4e82-a347-3ece7624d6ea')).rejects.toBeInstanceOf(
+    await expect(service.getMovieById('91af3be9-d9d0-4e82-a347-3ece7624d6ea', 'en')).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });

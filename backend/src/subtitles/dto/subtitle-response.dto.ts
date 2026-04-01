@@ -22,12 +22,16 @@ export class SubtitleResponseDto {
   @ApiProperty({ nullable: true, example: '/movies/<movieId>/subtitles/<subtitleId>/file' })
   src: string | null;
 
-  constructor(subtitle: SubtitleModel) {
+  @ApiProperty({ example: false })
+  isDefault: boolean;
+
+  constructor(subtitle: SubtitleModel, isDefault = false) {
     this.id = subtitle.id;
     this.movieId = subtitle.movieId;
     this.languageCode = subtitle.languageCode;
     this.format = subtitle.format;
     this.status = subtitle.status;
     this.src = subtitle.status === 'READY' ? `/movies/${subtitle.movieId}/subtitles/${subtitle.id}/file` : null;
+    this.isDefault = isDefault;
   }
 }
