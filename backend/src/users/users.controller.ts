@@ -5,6 +5,7 @@ import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { UserEntity } from './entities/user.entity';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
 import {
     ApiBadRequestResponse,
     ApiBody,
@@ -27,7 +28,7 @@ export class UsersController {
     @ApiOperation({ summary: 'Create local user account' })
     @ApiBody({ type: CreateLocalUserDto })
     @ApiOkResponse({ type: UserEntity })
-    @ApiBadRequestResponse({ description: 'Validation failed for signup payload' })
+    @ApiBadRequestResponse({ description: 'Validation failed for signup payload', type: ErrorResponseDto })
     create(@Body() createLocalUserDto: CreateLocalUserDto) {
         return this.usersService.createLocalUser(createLocalUserDto);
     }
@@ -37,7 +38,7 @@ export class UsersController {
     @SerializeOptions({ groups: ['self'] })
     @ApiOperation({ summary: 'Get current authenticated user profile' })
     @ApiOkResponse({ type: UserEntity })
-    @ApiUnauthorizedResponse({ description: 'Authentication required' })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
     getProfile(@CurrentUser() user: UserEntity): UserEntity {
         return user;
     }
@@ -47,8 +48,8 @@ export class UsersController {
     @ApiOperation({ summary: 'Get user by id' })
     @ApiParam({ name: 'id', description: 'User UUID' })
     @ApiOkResponse({ type: UserEntity })
-    @ApiUnauthorizedResponse({ description: 'Authentication required' })
-    @ApiNotFoundResponse({ description: 'User not found' })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    @ApiNotFoundResponse({ description: 'User not found', type: ErrorResponseDto })
     async getUserById(@Param('id') id: string, @CurrentUser() currentUser: UserEntity): Promise<UserEntity> {
         const user = await this.usersService.findById(id);
 
@@ -69,9 +70,9 @@ export class UsersController {
     @ApiParam({ name: 'id', description: 'User UUID' })
     @ApiBody({ type: UpdateUserDto })
     @ApiOkResponse({ type: UserEntity })
-    @ApiUnauthorizedResponse({ description: 'Authentication required' })
-    @ApiForbiddenResponse({ description: 'Cannot update another user profile' })
-    @ApiBadRequestResponse({ description: 'Validation failed for update payload' })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    @ApiForbiddenResponse({ description: 'Cannot update another user profile', type: ErrorResponseDto })
+    @ApiBadRequestResponse({ description: 'Validation failed for update payload', type: ErrorResponseDto })
     async updateUser(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @CurrentUser() currentUser: UserEntity): Promise<UserEntity> {
         if (currentUser.id !== id) {
             throw new ForbiddenException(`You can only update your own profile`);

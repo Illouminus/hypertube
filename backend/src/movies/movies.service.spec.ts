@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MoviesService } from './movies.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { MoviesSortBy, SortOrder } from './dto/movies-sort.enum';
 
 describe('MoviesService', () => {
   let service: MoviesService;
@@ -21,6 +22,10 @@ describe('MoviesService', () => {
         findMany: jest.fn(),
         count: jest.fn(),
         findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      movieView: {
+        upsert: jest.fn(),
       },
     };
 
@@ -77,8 +82,8 @@ describe('MoviesService', () => {
       yearMin: 1990,
       yearMax: 2005,
       ratingMin: 7,
-      sortBy: 'year',
-      sortOrder: 'asc',
+      sortBy: MoviesSortBy.YEAR,
+      sortOrder: SortOrder.ASC,
       page: 2,
       limit: 10,
     });
@@ -162,5 +167,45 @@ describe('MoviesService', () => {
     await expect(service.getMovieById('91af3be9-d9d0-4e82-a347-3ece7624d6ea')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('records a movie view and updates lastViewedAt', async () => {
+    const movieId = '91af3be9-d9d0-4e82-a347-3ece7624d6ea';
+    const userId = 'user-id-123';
+    const viewDate = new Date();
+
+    prisma.movie.findUnique.mockResolvedValue({ id: movieId });
+    prisma.$transaction.mockResolvedValue([
+      {
+        id: 'view-id-123',
+        userId,
+        movieId,
+        viewedAt: viewDate,
+        createdAt: viewDate,
+        updatedAt: viewDate,
+      },
+      { id: movieId, lastViewedAt: viewDate },
+    ]);
+
+    const result = await service.recordView(movieId, userId);
+
+    expect(prisma.movie.findUnique).toHaveBeenCalledWith({ where: { id: movieId } });
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'view-id-123',
+        userId,
+        movieId,
+      }),
+    );
+  });
+
+  it('throws not found when recording view for non-existent movie', async () => {
+    const movieId = '91af3be9-d9d0-4e82-a347-3ece7624d6ea';
+    const userId = 'user-id-123';
+
+    prisma.movie.findUnique.mockResolvedValue(null);
+
+    await expect(service.recordView(movieId, userId)).rejects.toBeInstanceOf(NotFoundException);
   });
 });

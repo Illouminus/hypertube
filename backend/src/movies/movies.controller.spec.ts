@@ -12,6 +12,7 @@ describe('MoviesController', () => {
     moviesService = {
       getMovies: jest.fn(),
       getMovieById: jest.fn(),
+      recordView: jest.fn(),
     };
     moviesCronService = {
       fetchAndCacheJackettMovies: jest.fn(),
@@ -58,5 +59,22 @@ describe('MoviesController', () => {
 
     await expect(controller.getMovieById(movieId)).resolves.toEqual(response);
     expect(moviesService.getMovieById).toHaveBeenCalledWith(movieId);
+  });
+
+  it('records a movie view for authenticated user', async () => {
+    const movieId = '91af3be9-d9d0-4e82-a347-3ece7624d6ea';
+    const user = { id: 'user-123', email: 'user@example.com' };
+    const response = {
+      id: 'view-id-123',
+      userId: user.id,
+      movieId,
+      viewedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    moviesService.recordView.mockResolvedValue(response);
+
+    await expect(controller.recordMovieView(movieId, user as any)).resolves.toEqual(response);
+    expect(moviesService.recordView).toHaveBeenCalledWith(movieId, user.id);
   });
 });

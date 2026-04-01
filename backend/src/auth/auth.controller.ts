@@ -11,6 +11,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ApiBadRequestResponse, ApiBody, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse, ApiTags } from '@nestjs/swagger';
+import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -58,8 +59,8 @@ export class AuthController {
             },
         },
     })
-    @ApiBadRequestResponse({ description: 'Validation failed for login payload' })
-    @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
+    @ApiBadRequestResponse({ description: 'Validation failed for login payload', type: ErrorResponseDto })
+    @ApiUnauthorizedResponse({ description: 'Invalid credentials', type: ErrorResponseDto })
     async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<{ success: boolean }> {
         const { email, password } = loginDto;
         const user = await this.authService.validateUser(email, password);
@@ -78,7 +79,7 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @Post('logout')
     @ApiOperation({ summary: 'Logout current user and clear auth cookie' })
-    @ApiUnauthorizedResponse({ description: 'Authentication required' })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
     async logout(@Res({ passthrough: true }) res: Response): Promise<{ success: boolean }> {
         res.clearCookie('access_token', this.getCookieOptions());
         return { success: true };
@@ -115,7 +116,7 @@ export class AuthController {
     @Post('forgot-password')
     @ApiOperation({ summary: 'Request password reset link' })
     @ApiBody({ type: ForgotPasswordDto })
-    @ApiBadRequestResponse({ description: 'Validation failed for email field' })
+    @ApiBadRequestResponse({ description: 'Validation failed for email field', type: ErrorResponseDto })
     async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
         this.authService.forgotPassword(forgotPasswordDto.email);
         return { message: 'If an account with that email exists, a password reset link has been sent.' };
@@ -125,7 +126,7 @@ export class AuthController {
     @Post('reset-password')
     @ApiOperation({ summary: 'Reset password using token' })
     @ApiBody({ type: ResetPasswordDto })
-    @ApiBadRequestResponse({ description: 'Validation failed or token is invalid/expired' })
+    @ApiBadRequestResponse({ description: 'Validation failed or token is invalid/expired', type: ErrorResponseDto })
     async resetPassword(@Body() resetPasswordDto: ResetPasswordDto): Promise<{ success: boolean }> {
         await this.authService.resetPassword(resetPasswordDto);
         return { success: true };

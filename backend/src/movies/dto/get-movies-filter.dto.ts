@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { MoviesSortBy, SortOrder } from './movies-sort.enum';
 
 export class GetMoviesFilterDto {
   @ApiPropertyOptional({ example: 'matrix', description: 'Search in title and summary' })
@@ -35,17 +36,15 @@ export class GetMoviesFilterDto {
   @Max(10)
   ratingMin?: number;
 
-  @ApiPropertyOptional({ enum: ['title', 'year', 'rating'] })
+  @ApiPropertyOptional({ enum: MoviesSortBy })
   @IsOptional()
-  @IsString()
-  @IsIn(['title', 'year', 'rating'])
-  sortBy?: 'title' | 'year' | 'rating';
+  @IsEnum(MoviesSortBy)
+  sortBy?: MoviesSortBy;
 
-  @ApiPropertyOptional({ enum: ['asc', 'desc'] })
+  @ApiPropertyOptional({ enum: SortOrder })
   @IsOptional()
-  @IsString()
-  @IsIn(['asc', 'desc'])
-  sortOrder?: 'asc' | 'desc';
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 
   @ApiPropertyOptional({ example: 1, minimum: 1 })
   @IsOptional()

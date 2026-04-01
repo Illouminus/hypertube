@@ -3,6 +3,8 @@ import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { GetMoviesFilterDto } from './dto/get-movies-filter.dto';
 import { MovieResponseDto, MoviesListResponseDto } from './dto/movie-response.dto';
+import { MoviesSortBy, SortOrder } from './dto/movies-sort.enum';
+import { RecordViewDto } from './dto/record-view.dto';
 
 @Injectable()
 export class MoviesService {
@@ -45,8 +47,8 @@ export class MoviesService {
 			where.rating = { gte: filters.ratingMin };
 		}
 
-		const sortBy = filters.sortBy ?? 'rating';
-		const sortOrder: Prisma.SortOrder = filters.sortOrder ?? 'desc';
+		const sortBy = filters.sortBy ?? MoviesSortBy.RATING;
+		const sortOrder: Prisma.SortOrder = (filters.sortOrder ?? SortOrder.DESC) as Prisma.SortOrder;
 		const orderBy: Prisma.MovieOrderByWithRelationInput = { [sortBy]: sortOrder };
 
 		const [data, total] = await this.prisma.$transaction([
@@ -76,5 +78,31 @@ export class MoviesService {
 		}
 
 		return new MovieResponseDto(movie);
+	}
+
+	async recordView(movieId: string, userId: string) {
+		// Verify movie exists
+		const movie = await this.prisma.movie.findUnique({
+			where: { id: movieId },
+		});
+
+		if (!movie) {
+			throw new NotFoundException(`Movie with id ${movieId} not found`);
+		}
+
+		// Upsert movie view record and update movie's lastViewedAt
+		const [movieView] = await this.prisma.$transaction([
+			this.prisma.movieView.upsert({
+				where: { userId_movieId: { userId, movieId } },
+				update: { viewedAt: new Date() },
+				create: { userId, movieId, viewedAt: new Date() },
+			}),
+			this.prisma.movie.update({
+				where: { id: movieId },
+				data: { lastViewedAt: new Date() },
+			}),
+		]);
+
+		return new RecordViewDto(movieView);
 	}
 }
