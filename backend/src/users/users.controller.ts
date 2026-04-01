@@ -1,4 +1,4 @@
-import { ClassSerializerInterceptor, Controller, Post, Body, UseInterceptors, UseGuards, Get, Req, SerializeOptions, Param, NotFoundException, Patch, ForbiddenException } from '@nestjs/common';
+import { ClassSerializerInterceptor, Controller, Post, Body, UseInterceptors, UseGuards, Get, SerializeOptions, Param, NotFoundException, Patch, ForbiddenException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateLocalUserDto } from './dto/create-local-user.dto';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
@@ -6,6 +6,7 @@ import { UserEntity } from './entities/user.entity';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
+import { UserListItemDto } from './dto/user-list-item.dto';
 import {
     ApiBadRequestResponse,
     ApiBody,
@@ -31,6 +32,15 @@ export class UsersController {
     @ApiBadRequestResponse({ description: 'Validation failed for signup payload', type: ErrorResponseDto })
     create(@Body() createLocalUserDto: CreateLocalUserDto) {
         return this.usersService.createLocalUser(createLocalUserDto);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get()
+    @ApiOperation({ summary: 'Get public users list (id and username)' })
+    @ApiOkResponse({ type: [UserListItemDto] })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    getUsers() {
+        return this.usersService.findAllPublicUsers();
     }
 
     @UseGuards(JwtAuthGuard)

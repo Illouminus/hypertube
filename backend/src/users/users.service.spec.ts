@@ -34,6 +34,7 @@ describe('UsersService', () => {
       findFirst: jest.Mock;
       create: jest.Mock;
       findUnique: jest.Mock;
+      findMany: jest.Mock;
     };
   };
 
@@ -43,6 +44,7 @@ describe('UsersService', () => {
         findFirst: jest.fn(),
         create: jest.fn(),
         findUnique: jest.fn(),
+        findMany: jest.fn(),
       },
     };
 
@@ -149,6 +151,26 @@ describe('UsersService', () => {
       const result = await service.findById('missing-id');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('findAllPublicUsers', () => {
+    it('returns users with only id and username', async () => {
+      prismaService.user.findMany.mockResolvedValue([
+        { id: 'u1', username: 'alice' },
+        { id: 'u2', username: 'bob' },
+      ]);
+
+      const result = await service.findAllPublicUsers();
+
+      expect(prismaService.user.findMany).toHaveBeenCalledWith({
+        select: { id: true, username: true },
+        orderBy: { username: 'asc' },
+      });
+      expect(result).toEqual([
+        { id: 'u1', username: 'alice' },
+        { id: 'u2', username: 'bob' },
+      ]);
     });
   });
 });

@@ -7,10 +7,25 @@ import { UserEntity } from './entities/user.entity';
 import { FortyTwoProfile } from 'src/auth/interfaces/fortytwo-profile.interface';
 import { GoogleProfile } from 'src/auth/interfaces/google-profile.interface';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserListItemDto } from './dto/user-list-item.dto';
 
 @Injectable()
 export class UsersService {
     constructor(private prisma: PrismaService) {}
+
+    async findAllPublicUsers(): Promise<UserListItemDto[]> {
+        const users = await this.prisma.user.findMany({
+            select: {
+                id: true,
+                username: true,
+            },
+            orderBy: {
+                username: 'asc',
+            },
+        });
+
+        return users.map((user) => new UserListItemDto(user));
+    }
 
 
     async createLocalUser(createUserDto: CreateLocalUserDto) {

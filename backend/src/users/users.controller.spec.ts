@@ -23,11 +23,12 @@ const createUser = () =>
 
 describe('UsersController', () => {
   let controller: UsersController;
-  let usersService: { createLocalUser: jest.Mock };
+  let usersService: { createLocalUser: jest.Mock; findAllPublicUsers: jest.Mock };
 
   beforeEach(async () => {
     usersService = {
       createLocalUser: jest.fn(),
+      findAllPublicUsers: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -74,6 +75,21 @@ describe('UsersController', () => {
       const result = controller.getProfile(user);
 
       expect(result).toBe(user);
+    });
+  });
+
+  describe('getUsers', () => {
+    it('returns public users list', async () => {
+      const users = [
+        { id: 'u1', username: 'alice' },
+        { id: 'u2', username: 'bob' },
+      ];
+      usersService.findAllPublicUsers.mockResolvedValue(users);
+
+      const result = await controller.getUsers();
+
+      expect(usersService.findAllPublicUsers).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(users);
     });
   });
 });
