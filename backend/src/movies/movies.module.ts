@@ -3,9 +3,10 @@ import { HttpModule } from '@nestjs/axios';
 import { MoviesController } from './movies.controller';
 import { MoviesService } from './movies.service';
 import { MoviesCronService } from './movies-cron/movies-cron.service';
+import { CommentsModule } from 'src/comments/comments.module';
 
 @Module({
-  imports: [HttpModule],
+  imports: [HttpModule, CommentsModule],
   controllers: [MoviesController],
   providers: [MoviesService, MoviesCronService]
 })

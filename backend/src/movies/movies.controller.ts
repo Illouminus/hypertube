@@ -1,14 +1,27 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { MoviesCronService } from './movies-cron/movies-cron.service';
 import { MoviesService } from './movies.service';
 import { GetMoviesFilterDto } from './dto/get-movies-filter.dto';
 import { MovieResponseDto, MoviesListResponseDto } from './dto/movie-response.dto';
-import { ApiBadRequestResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import {
+    ApiBadRequestResponse,
+    ApiBody,
+    ApiForbiddenResponse,
+    ApiNotFoundResponse,
+    ApiOkResponse,
+    ApiOperation,
+    ApiParam,
+    ApiTags,
+    ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
 import { RecordViewDto } from './dto/record-view.dto';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { CommentsService } from 'src/comments/comments.service';
+import { CommentResponseDto } from 'src/comments/dto/comment-response.dto';
+import { CreateMovieCommentDto } from 'src/comments/dto/create-movie-comment.dto';
 
 @ApiTags('movies')
 @Controller('movies')
@@ -17,6 +30,7 @@ export class MoviesController {
     constructor(
         private readonly moviesService: MoviesService,
         private readonly moviesCronService: MoviesCronService,
+        private readonly commentsService: CommentsService,
     ) {}
 
     @ApiOperation({ summary: 'Get movies from local cache with filters' })
@@ -40,6 +54,35 @@ export class MoviesController {
     @Get(':id')
     async getMovieById(@Param('id', new ParseUUIDPipe()) id: string) {
         return this.moviesService.getMovieById(id);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get(':id/comments')
+    @ApiOperation({ summary: 'Get comments for one movie' })
+    @ApiParam({ name: 'id', description: 'Movie UUID' })
+    @ApiOkResponse({ type: [CommentResponseDto] })
+    @ApiBadRequestResponse({ description: 'Invalid movie id format (must be UUID)', type: ErrorResponseDto })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    async getMovieComments(@Param('id', new ParseUUIDPipe()) movieId: string) {
+        return this.commentsService.getMovieComments(movieId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post(':id/comments')
+    @ApiOperation({ summary: 'Create comment for one movie' })
+    @ApiParam({ name: 'id', description: 'Movie UUID' })
+    @ApiBody({ type: CreateMovieCommentDto })
+    @ApiOkResponse({ type: CommentResponseDto })
+    @ApiBadRequestResponse({ description: 'Invalid movie id format or payload', type: ErrorResponseDto })
+    @ApiNotFoundResponse({ description: 'Movie not found', type: ErrorResponseDto })
+    @ApiForbiddenResponse({ description: 'Comment action forbidden', type: ErrorResponseDto })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    async createMovieComment(
+        @Param('id', new ParseUUIDPipe()) movieId: string,
+        @Body() dto: CreateMovieCommentDto,
+        @CurrentUser() user: UserEntity,
+    ) {
+        return this.commentsService.createCommentForMovie(movieId, dto, user.id);
     }
 
     @UseGuards(JwtAuthGuard)

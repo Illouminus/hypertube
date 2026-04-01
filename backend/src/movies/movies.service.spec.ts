@@ -176,7 +176,7 @@ describe('MoviesService', () => {
       service.getMovies({
         yearMin: 2020,
         yearMax: 2000,
-      }),
+      }, 'user-id-123'),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -197,13 +197,30 @@ describe('MoviesService', () => {
       createdAt: new Date('2026-03-24T00:00:00.000Z'),
       updatedAt: new Date('2026-03-24T00:00:00.000Z'),
       torrents: [],
+      comments: [],
     });
 
     const result = await service.getMovieById('91af3be9-d9d0-4e82-a347-3ece7624d6ea');
 
     expect(prisma.movie.findUnique).toHaveBeenCalledWith({
       where: { id: '91af3be9-d9d0-4e82-a347-3ece7624d6ea' },
-      include: { torrents: true },
+      include: {
+        torrents: true,
+        comments: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                profilePictureUrl: true,
+              },
+            },
+          },
+        },
+      },
     });
     expect(result).toEqual(
       expect.objectContaining({

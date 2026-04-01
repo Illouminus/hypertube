@@ -2,11 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MoviesController } from './movies.controller';
 import { MoviesService } from './movies.service';
 import { MoviesCronService } from './movies-cron/movies-cron.service';
+import { CommentsService } from 'src/comments/comments.service';
 
 describe('MoviesController', () => {
   let controller: MoviesController;
   let moviesService: { getMovies: jest.Mock; getMovieById: jest.Mock; recordView: jest.Mock };
   let moviesCronService: { fetchAndCacheJackettMovies: jest.Mock; cleanupStaleLibrary: jest.Mock };
+  let commentsService: { getMovieComments: jest.Mock; createCommentForMovie: jest.Mock };
 
   beforeEach(async () => {
     moviesService = {
@@ -18,12 +20,17 @@ describe('MoviesController', () => {
       fetchAndCacheJackettMovies: jest.fn(),
       cleanupStaleLibrary: jest.fn(),
     };
+    commentsService = {
+      getMovieComments: jest.fn(),
+      createCommentForMovie: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MoviesController],
       providers: [
         { provide: MoviesService, useValue: moviesService },
         { provide: MoviesCronService, useValue: moviesCronService },
+        { provide: CommentsService, useValue: commentsService },
       ],
     }).compile();
 
@@ -95,5 +102,25 @@ describe('MoviesController', () => {
 
     await expect(controller.recordMovieView(movieId, user as any)).resolves.toEqual(response);
     expect(moviesService.recordView).toHaveBeenCalledWith(movieId, user.id);
+  });
+
+  it('returns movie comments', async () => {
+    const movieId = '91af3be9-d9d0-4e82-a347-3ece7624d6ea';
+    const response = [{ id: 'comment-1', content: 'Great movie' }];
+    commentsService.getMovieComments.mockResolvedValue(response);
+
+    await expect(controller.getMovieComments(movieId)).resolves.toEqual(response);
+    expect(commentsService.getMovieComments).toHaveBeenCalledWith(movieId);
+  });
+
+  it('creates a movie comment', async () => {
+    const movieId = '91af3be9-d9d0-4e82-a347-3ece7624d6ea';
+    const user = { id: 'user-123' };
+    const dto = { content: 'Amazing!' };
+    const response = { id: 'comment-1', movieId, userId: user.id, content: 'Amazing!' };
+    commentsService.createCommentForMovie.mockResolvedValue(response);
+
+    await expect(controller.createMovieComment(movieId, dto, user as any)).resolves.toEqual(response);
+    expect(commentsService.createCommentForMovie).toHaveBeenCalledWith(movieId, dto, user.id);
   });
 });

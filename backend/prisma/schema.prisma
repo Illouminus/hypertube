@@ -43,6 +43,7 @@ model User {
   
   // Relationships
   movieViews MovieView[]
+  comments Comment[]
 }
 
 
@@ -70,7 +71,7 @@ model Movie {
 
   torrents Torrent[] // Relationship to Torrent model
   movieViews MovieView[] // Relationship to MovieView model for tracking user views
-  // comments Comment[] // Relationship to Comment model
+  comments Comment[] // Relationship to Comment model
 }
 
 
@@ -110,4 +111,22 @@ model MovieView {
   
   // Ensure each user can only have one "current" view record per movie
   @@unique([userId, movieId])
+}
+
+// Comment model to track movie discussion
+model Comment {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  movieId   String
+  movie     Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([movieId])
+  @@index([userId])
 }

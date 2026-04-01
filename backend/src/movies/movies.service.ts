@@ -77,7 +77,23 @@ export class MoviesService {
 	async getMovieById(id: string) {
 		const movie = await this.prisma.movie.findUnique({
 			where: { id },
-			include: { torrents: true },
+			include: {
+				torrents: true,
+				comments: {
+					orderBy: { createdAt: 'desc' },
+					include: {
+						user: {
+							select: {
+								id: true,
+								username: true,
+								firstName: true,
+								lastName: true,
+								profilePictureUrl: true,
+							},
+						},
+					},
+				},
+			},
 		});
 
 		if (!movie) {
