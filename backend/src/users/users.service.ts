@@ -1,5 +1,9 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { writeFile, mkdir, rm } from 'node:fs/promises';
+import { join, extname } from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 import * as bcrypt from 'bcrypt';
 import { CreateLocalUserDto } from './dto/create-local-user.dto';
@@ -11,7 +15,12 @@ import { UserListItemDto } from './dto/user-list-item.dto';
 
 @Injectable()
 export class UsersService {
-    constructor(private prisma: PrismaService) {}
+    private readonly uploadsDir = join(process.cwd(), '..', 'uploads', 'avatars');
+
+    constructor(
+        private prisma: PrismaService,
+        private configService: ConfigService,
+    ) {}
 
     async findAllPublicUsers(): Promise<UserListItemDto[]> {
         const users = await this.prisma.user.findMany({
@@ -217,6 +226,36 @@ export class UsersService {
                 ...(username && { username }),
                 ...(hashedPassword && { password: hashedPassword }),
             },
+        });
+
+        return new UserEntity(updatedUser);
+    }
+
+    /** Save uploaded avatar to disk and update the user's profilePictureUrl */
+    async updateAvatar(userId: string, file: Express.Multer.File): Promise<UserEntity> {
+        await mkdir(this.uploadsDir, { recursive: true });
+
+        // Delete the previous avatar file if it was a local upload
+        const currentUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { profilePictureUrl: true } });
+        if (currentUser?.profilePictureUrl?.includes('/uploads/avatars/')) {
+            const oldFilename = currentUser.profilePictureUrl.split('/uploads/avatars/').pop();
+            if (oldFilename) {
+                await rm(join(this.uploadsDir, oldFilename), { force: true }).catch(() => {});
+            }
+        }
+
+        const ext = extname(file.originalname) || '.jpg';
+        const filename = `${randomUUID()}${ext}`;
+        const filePath = join(this.uploadsDir, filename);
+
+        await writeFile(filePath, file.buffer);
+
+        const baseUrl = this.configService.get<string>('NEXT_PUBLIC_API_URL', 'http://localhost:3001');
+        const profilePictureUrl = `${baseUrl}/uploads/avatars/${filename}`;
+
+        const updatedUser = await this.prisma.user.update({
+            where: { id: userId },
+            data: { profilePictureUrl },
         });
 
         return new UserEntity(updatedUser);

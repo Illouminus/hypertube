@@ -42,6 +42,8 @@ type MovieListItem = MovieWithTorrents | MovieWithTorrentsAndViews | MovieWithDe
 
 export class TorrentResponseDto {
   @ApiProperty()
+  id: string;
+  @ApiProperty()
   hash: string;
   @ApiProperty()
   magnet: string;
@@ -53,14 +55,21 @@ export class TorrentResponseDto {
   seeds: number;
   @ApiProperty()
   peers: number;
+  @ApiProperty({ example: false })
+  isDownloaded: boolean;
+  @ApiProperty({ description: 'URL to stream this torrent', example: '/stream/abc-123' })
+  streamUrl: string;
 
   constructor(torrent: MovieWithTorrents['torrents'][number]) {
+    this.id = torrent.id;
     this.hash = torrent.hash;
     this.magnet = torrent.magnet;
     this.quality = torrent.quality;
     this.size = torrent.size;
     this.seeds = torrent.seeds;
     this.peers = torrent.peers;
+    this.isDownloaded = torrent.isDownloaded;
+    this.streamUrl = `/stream/${torrent.id}`;
   }
 }
 

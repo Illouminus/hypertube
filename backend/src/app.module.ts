@@ -10,6 +10,7 @@ import { MailModule } from './mail/mail.module';
 import { MoviesModule } from './movies/movies.module';
 import { CommentsModule } from './comments/comments.module';
 import { TorrentModule } from './torrent/torrent.module';
+import { StreamModule } from './stream/stream.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { TorrentModule } from './torrent/torrent.module';
     MoviesModule,
     CommentsModule,
     TorrentModule,
+    StreamModule,
   ],
   controllers: [AppController],
   providers: [AppService],

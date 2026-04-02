@@ -6,6 +6,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { rm } from 'node:fs/promises';
 import { extname } from 'node:path';
+import { TorrentService } from 'src/torrent/torrent.service';
 
 type CleanupStats = {
     moviesFound: number;
@@ -26,6 +27,7 @@ export class MoviesCronService {
         private readonly httpService: HttpService,
         private readonly prisma: PrismaService,
         private readonly configService: ConfigService,
+        private readonly torrentService: TorrentService,
     ) {}
 
     @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
@@ -51,6 +53,7 @@ export class MoviesCronService {
             include: {
                 torrents: {
                     select: {
+                        id: true,
                         filePath: true,
                     },
                 },
@@ -71,6 +74,8 @@ export class MoviesCronService {
 
         for (const movie of staleMovies) {
             for (const torrent of movie.torrents) {
+                // Remove from Transmission daemon (also deletes files on disk)
+                await this.torrentService.removeTorrentData(torrent.id);
                 const result = await this.deleteLocalMediaArtifacts(torrent.filePath);
                 stats.mediaDeleteAttempts += result.attempts;
                 stats.mediaDeleteSucceeded += result.succeeded;

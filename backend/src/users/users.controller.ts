@@ -1,4 +1,5 @@
-import { ClassSerializerInterceptor, Controller, Post, Body, UseInterceptors, UseGuards, Get, SerializeOptions, Param, NotFoundException, Patch, ForbiddenException } from '@nestjs/common';
+import { ClassSerializerInterceptor, Controller, Post, Body, UseInterceptors, UseGuards, Get, SerializeOptions, Param, NotFoundException, Patch, ForbiddenException, UploadedFile, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { CreateLocalUserDto } from './dto/create-local-user.dto';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
@@ -10,6 +11,7 @@ import { UserListItemDto } from './dto/user-list-item.dto';
 import {
     ApiBadRequestResponse,
     ApiBody,
+    ApiConsumes,
     ApiForbiddenResponse,
     ApiNotFoundResponse,
     ApiOkResponse,
@@ -90,5 +92,33 @@ export class UsersController {
         return this.usersService.updateUser(id, updateUserDto);
     }
 
-
+    /** Upload a profile picture (max 5MB, images only) */
+    @UseGuards(JwtAuthGuard)
+    @Post(':id/avatar')
+    @UseInterceptors(FileInterceptor('avatar'))
+    @ApiOperation({ summary: 'Upload profile picture' })
+    @ApiConsumes('multipart/form-data')
+    @ApiParam({ name: 'id', description: 'User UUID' })
+    @ApiBody({ schema: { type: 'object', properties: { avatar: { type: 'string', format: 'binary' } } } })
+    @ApiOkResponse({ type: UserEntity })
+    @ApiForbiddenResponse({ description: 'Cannot update another user profile', type: ErrorResponseDto })
+    @ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
+    async uploadAvatar(
+        @Param('id') id: string,
+        @CurrentUser() currentUser: UserEntity,
+        @UploadedFile(
+            new ParseFilePipe({
+                validators: [
+                    new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+                    new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp|gif)$/ }),
+                ],
+            }),
+        )
+        file: Express.Multer.File,
+    ) {
+        if (currentUser.id !== id) {
+            throw new ForbiddenException('You can only update your own profile');
+        }
+        return this.usersService.updateAvatar(id, file);
+    }
 }
