@@ -39,8 +39,7 @@ export class HlsController {
 		const playlist = await this.segments.generatePlaylist(jobId);
 
 		if (!playlist) {
-			res.status(404).json({ message: `Job ${jobId} not found` });
-			return;
+			throw new NotFoundException(`Job ${jobId} not found`);
 		}
 
 		res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
@@ -70,8 +69,7 @@ export class HlsController {
 		const stream = await this.segments.getSegmentStream(jobId, segmentName);
 
 		if (!stream) {
-			res.status(404).json({ message: `Segment ${segmentName} not found` });
-			return;
+			throw new NotFoundException(`Segment ${segmentName} not found`);
 		}
 
 		res.setHeader('Content-Type', 'video/mp2t');

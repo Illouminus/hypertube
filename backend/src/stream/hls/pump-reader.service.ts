@@ -36,11 +36,13 @@ export class PumpReaderService {
 		totalBytes: number,
 		getDownloadedBytes: () => Promise<number>,
 		pollIntervalMs: number = 500,
+		stallTimeoutSec: number = 30,
 	): Readable {
 		const outputStream = new PassThrough();
+		const stallTimeoutMs = Math.max(1, stallTimeoutSec) * 1000;
 
 		// Start the pump loop in background (non-blocking)
-		this.pumpFile(filePath, outputStream, totalBytes, getDownloadedBytes, pollIntervalMs).catch((err) => {
+		this.pumpFile(filePath, outputStream, totalBytes, getDownloadedBytes, pollIntervalMs, stallTimeoutMs).catch((err) => {
 			this.logger.error(`Pump reader error: ${err.message}`);
 			outputStream.destroy(err);
 		});
@@ -65,10 +67,10 @@ export class PumpReaderService {
 		totalBytes: number,
 		getDownloadedBytes: () => Promise<number>,
 		pollIntervalMs: number,
+		stallTimeoutMs: number,
 	): Promise<void> {
 		let offset = 0;
 		let lastActivityTime = Date.now();
-		const stallTimeoutMs = 30_000; // 30 seconds
 
 		while (true) {
 			try {

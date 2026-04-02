@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { spawn, ChildProcess } from 'node:child_process';
 import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -17,7 +17,7 @@ import { HlsJob, HlsJobConfig, HlsJobStatus, HlsJobStatusDto } from './hls-job.t
  * 5. Manage cleanup and error handling.
  */
 @Injectable()
-export class HlsManagerService {
+export class HlsManagerService implements OnModuleDestroy {
 	private readonly logger = new Logger(HlsManagerService.name);
 
 	/** Map of all active jobs: jobId -> HlsJob */
@@ -34,6 +34,12 @@ export class HlsManagerService {
 		private readonly pumpReader: PumpReaderService,
 	) {
 		this.ensureOutputDir();
+	}
+
+	async onModuleDestroy(): Promise<void> {
+		for (const jobId of this.jobs.keys()) {
+			await this.cleanupJob(jobId);
+		}
 	}
 
 	/**
@@ -215,6 +221,7 @@ export class HlsManagerService {
 			job.totalBytes ?? 0,
 			() => this.torrentService.getDownloadedBytes(torrentId),
 			job.config.pollIntervalMs,
+			job.config.stallTimeoutSec,
 		);
 
 		// Build ffmpeg command
