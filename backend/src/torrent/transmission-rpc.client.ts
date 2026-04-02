@@ -103,6 +103,25 @@ export class TransmissionRpcClient {
 	}
 
 	/**
+	 * Resolve a Transmission torrent id by info-hash.
+	 *
+	 * Useful after API restarts where in-memory id mappings are lost.
+	 */
+	async findTorrentIdByHash(hash: string): Promise<number | null> {
+		const response = await this.rpc<{ torrents: Array<Pick<TransmissionTorrent, 'id' | 'hashString'>> }>(
+			'torrent-get',
+			{ fields: ['id', 'hashString'] },
+		);
+
+		const normalizedHash = hash.toLowerCase();
+		const match = response.torrents?.find(
+			(torrent) => torrent.hashString.toLowerCase() === normalizedHash,
+		);
+
+		return match?.id ?? null;
+	}
+
+	/**
 	 * Remove a torrent from Transmission.
 	 *
 	 * @param id              Transmission-internal numeric id

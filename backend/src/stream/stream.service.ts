@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TorrentService } from 'src/torrent/torrent.service';
 import { TorrentDownloadStatus } from 'src/torrent/dto/torrent-status-response.dto';
+import { HlsManagerService } from './hls/hls-manager.service';
 import { stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { extname } from 'node:path';
@@ -18,12 +19,19 @@ const NEEDS_TRANSCODE = new Set(['.mkv', '.avi', '.mov']);
 
 /** Result of parsing the HTTP Range header */
 type ParsedRange = { start: number; end: number };
+type RangeParseResult =
+	| { kind: 'none' }
+	| { kind: 'invalid' }
+	| { kind: 'valid'; range: ParsedRange };
 
 @Injectable()
 export class StreamService {
 	private readonly logger = new Logger(StreamService.name);
 
-	constructor(private readonly torrentService: TorrentService) {}
+	constructor(
+		private readonly torrentService: TorrentService,
+		private readonly hlsManager: HlsManagerService,
+	) {}
 
 	/**
 	 * Stream a torrent's video file to the client via HTTP Range Requests.
@@ -71,28 +79,57 @@ export class StreamService {
 			return;
 		}
 
-		// Step 4: serve — either transcode (MKV/AVI) or direct Range-based streaming
+		// Step 4: serve — either start HLS (MKV/AVI) or direct Range-based streaming
 		const ext = extname(filePath).toLowerCase();
 
 		if (NEEDS_TRANSCODE.has(ext)) {
-			if (!isComplete) {
-				res.status(202).json({
-					message: 'MKV transcoding requires full download, please wait',
-					progress: status.progress,
-				});
-				return;
-			}
-			this.serveTranscoded(res, filePath);
+			// Instead of waiting for complete, start HLS live transcoding pipeline
+			await this.serveHls(torrentId, filePath, fileSize, res);
 			return;
 		}
 
 		const contentType = MIME_BY_EXT[ext] ?? 'video/mp4';
-		const range = this.parseRange(req.headers.range, availableBytes);
+		const rangeParseResult = this.parseRange(req.headers.range, availableBytes);
 
-		if (range) {
-			this.servePartialContent(res, filePath, range, availableBytes, contentType);
-		} else {
-			this.serveFullContent(res, filePath, availableBytes, contentType);
+		if (rangeParseResult.kind === 'invalid') {
+			this.serveInvalidRange(res, availableBytes);
+			return;
+		}
+
+		if (rangeParseResult.kind === 'valid') {
+			this.servePartialContent(res, filePath, rangeParseResult.range, availableBytes, contentType);
+			return;
+		}
+
+		this.serveFullContent(res, filePath, availableBytes, contentType);
+	}
+
+	/**
+	 * Start HLS live transcoding pipeline for incompatible formats.
+	 *
+	 * Instead of waiting for the entire file to download, we:
+	 * 1. Create an HLS job that manages transcoding.
+	 * 2. Return jobId + playlist URL to the client.
+	 * 3. Client polls playlist.m3u8 which gets updated as segments are generated.
+	 *
+	 * This allows playback to start while download is still in progress.
+	 */
+	private async serveHls(torrentId: string, filePath: string, fileSize: number, res: Response): Promise<void> {
+		try {
+			const jobId = await this.hlsManager.createHlsJob(torrentId, filePath, fileSize);
+
+			res.status(200).json({
+				streamType: 'hls',
+				jobId,
+				playlistUrl: `/stream/hls/${jobId}/playlist.m3u8`,
+				message: 'HLS transcoding started, playlist available at playlistUrl',
+			});
+		} catch (error) {
+			this.logger.error(`Failed to start HLS job: ${error}`);
+			res.status(500).json({
+				message: 'Failed to start HLS transcoding',
+				error: error instanceof Error ? error.message : 'Unknown error',
+			});
 		}
 	}
 
@@ -156,20 +193,57 @@ export class StreamService {
 	 * Supports the standard format: `bytes=START-END` or `bytes=START-`.
 	 * Returns null when no Range header is present (full download requested).
 	 */
-	private parseRange(header: string | undefined, totalBytes: number): ParsedRange | null {
-		if (!header?.startsWith('bytes=')) {
-			return null;
+	private parseRange(header: string | undefined, totalBytes: number): RangeParseResult {
+		if (!header) {
+			return { kind: 'none' };
 		}
 
-		const parts = header.replace('bytes=', '').split('-');
-		const start = parseInt(parts[0], 10);
-		const end = parts[1] ? parseInt(parts[1], 10) : totalBytes - 1;
-
-		if (isNaN(start) || start < 0 || start >= totalBytes) {
-			return null;
+		if (!header.startsWith('bytes=')) {
+			return { kind: 'invalid' };
 		}
 
-		return { start, end: Math.min(end, totalBytes - 1) };
+		const [rawStart, rawEnd] = header.replace('bytes=', '').split('-');
+
+		if (!rawStart && !rawEnd) {
+			return { kind: 'invalid' };
+		}
+
+		if (!rawStart && rawEnd) {
+			const suffixLength = parseInt(rawEnd, 10);
+			if (Number.isNaN(suffixLength) || suffixLength <= 0) {
+				return { kind: 'invalid' };
+			}
+
+			const start = Math.max(totalBytes - suffixLength, 0);
+			return { kind: 'valid', range: { start, end: totalBytes - 1 } };
+		}
+
+		const start = parseInt(rawStart, 10);
+		const end = rawEnd ? parseInt(rawEnd, 10) : totalBytes - 1;
+
+		if (Number.isNaN(start) || Number.isNaN(end)) {
+			return { kind: 'invalid' };
+		}
+
+		if (start < 0 || start >= totalBytes) {
+			return { kind: 'invalid' };
+		}
+
+		const normalizedEnd = Math.min(end, totalBytes - 1);
+		if (normalizedEnd < start) {
+			return { kind: 'invalid' };
+		}
+
+		return { kind: 'valid', range: { start, end: normalizedEnd } };
+	}
+
+	/** Respond with 416 when requested range can't be satisfied by available bytes */
+	private serveInvalidRange(res: Response, totalBytes: number): void {
+		res.writeHead(416, {
+			'Accept-Ranges': 'bytes',
+			'Content-Range': `bytes */${totalBytes}`,
+		});
+		res.end();
 	}
 
 	/** Respond with 206 Partial Content — standard for `<video>` tag streaming */

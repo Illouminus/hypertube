@@ -56,7 +56,7 @@ export class TorrentService {
 		}
 
 		// If we already track this torrent in Transmission, just return fresh status
-		const existingTrId = this.transmissionIds.get(torrentId);
+		const existingTrId = await this.resolveTransmissionId(torrentId, torrent.hash);
 		if (existingTrId !== undefined) {
 			return this.queryTransmissionStatus(torrentId, existingTrId);
 		}
@@ -90,7 +90,7 @@ export class TorrentService {
 			return this.buildStatusDto(torrentId, TorrentDownloadStatus.COMPLETED, 1, torrent.filePath, fileSize, fileSize);
 		}
 
-		const trId = this.transmissionIds.get(torrentId);
+		const trId = await this.resolveTransmissionId(torrentId, torrent.hash);
 		if (trId === undefined) {
 			return this.buildStatusDto(torrentId, TorrentDownloadStatus.IDLE, 0, null, null, 0);
 		}
@@ -114,7 +114,7 @@ export class TorrentService {
 			return torrent.filePath;
 		}
 
-		const trId = this.transmissionIds.get(torrentId);
+		const trId = await this.resolveTransmissionId(torrentId, torrent.hash);
 		if (trId === undefined) {
 			return null;
 		}
@@ -139,7 +139,8 @@ export class TorrentService {
 	 * because a torrent may contain multiple files and `haveValid` sums all of them.
 	 */
 	async getDownloadedBytes(torrentId: string): Promise<number> {
-		const trId = this.transmissionIds.get(torrentId);
+		const torrent = await this.findTorrentOrFail(torrentId);
+		const trId = await this.resolveTransmissionId(torrentId, torrent.hash);
 		if (trId === undefined) {
 			return 0;
 		}
@@ -208,6 +209,8 @@ export class TorrentService {
 		const status = this.mapTransmissionStatus(trTorrent);
 		const videoFile = this.findLargestVideoFile(trTorrent);
 		const filePath = videoFile ? resolve(trTorrent.downloadDir, videoFile.name) : null;
+		const downloadedBytes = this.getVideoDownloadedBytes(trTorrent, videoFile);
+		const totalSize = videoFile?.length ?? trTorrent.totalSize;
 
 		if (status === TorrentDownloadStatus.COMPLETED && filePath) {
 			await this.markAsDownloaded(torrentId, filePath);
@@ -218,8 +221,8 @@ export class TorrentService {
 			status,
 			trTorrent.percentDone,
 			filePath,
-			trTorrent.totalSize,
-			trTorrent.haveValid,
+			totalSize,
+			downloadedBytes,
 		);
 	}
 
@@ -276,6 +279,39 @@ export class TorrentService {
 		}
 
 		return largest;
+	}
+
+	/** Return downloaded bytes for the selected video file. */
+	private getVideoDownloadedBytes(
+		trTorrent: TransmissionTorrent,
+		videoFile: { name: string; length: number } | null,
+	): number {
+		if (!videoFile) {
+			return 0;
+		}
+
+		const fileEntry = trTorrent.files?.find((file) => file.name === videoFile.name);
+		return fileEntry?.bytesCompleted ?? 0;
+	}
+
+	/**
+	 * Resolve or rebuild mapping between DB torrent id and Transmission id.
+	 *
+	 * Returns undefined when the torrent is unknown to Transmission.
+	 */
+	private async resolveTransmissionId(torrentId: string, hash: string): Promise<number | undefined> {
+		const cached = this.transmissionIds.get(torrentId);
+		if (cached !== undefined) {
+			return cached;
+		}
+
+		const fromTransmission = await this.rpc.findTorrentIdByHash(hash);
+		if (fromTransmission === null) {
+			return undefined;
+		}
+
+		this.transmissionIds.set(torrentId, fromTransmission);
+		return fromTransmission;
 	}
 
 	/** Persist download completion in the database so we skip Transmission on future requests */

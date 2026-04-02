@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { StreamService } from './stream.service';
 import { TorrentService } from 'src/torrent/torrent.service';
+import { HlsManagerService } from './hls/hls-manager.service';
 import { TorrentDownloadStatus } from 'src/torrent/dto/torrent-status-response.dto';
 import * as fs from 'node:fs/promises';
 import * as nodeFs from 'node:fs';
@@ -19,6 +20,11 @@ const mockStatus = (overrides = {}) => ({
 	...overrides,
 });
 
+const hlsManagerMock = {
+	createHlsJob: jest.fn().mockResolvedValue('job-1'),
+	getJobStatus: jest.fn().mockReturnValue(null),
+};
+
 describe('StreamService', () => {
 	let service: StreamService;
 	let torrentService: {
@@ -32,6 +38,7 @@ describe('StreamService', () => {
 		json: jest.Mock;
 		writeHead: jest.Mock;
 		on: jest.Mock;
+		end: jest.Mock;
 	};
 	let mockReq: { headers: Record<string, string> };
 
@@ -46,6 +53,7 @@ describe('StreamService', () => {
 			providers: [
 				StreamService,
 				{ provide: TorrentService, useValue: torrentService },
+				{ provide: HlsManagerService, useValue: hlsManagerMock },
 			],
 		}).compile();
 
@@ -56,6 +64,7 @@ describe('StreamService', () => {
 			json: jest.fn().mockReturnThis(),
 			writeHead: jest.fn(),
 			on: jest.fn(),
+			end: jest.fn(),
 		};
 		mockReq = { headers: {} };
 	});
@@ -139,6 +148,40 @@ describe('StreamService', () => {
 				'Content-Range': 'bytes 500000-999999/1000000',
 				'Content-Length': 500000,
 			}));
+		});
+
+		it('should handle suffix range request', async () => {
+			torrentService.startDownload.mockResolvedValue(mockStatus());
+			torrentService.getVideoFilePath.mockResolvedValue('/downloads/movie.mp4');
+			(fs.stat as jest.Mock).mockResolvedValue({ size: 1000000 });
+
+			const mockStream = { pipe: jest.fn(), on: jest.fn().mockReturnThis() };
+			(nodeFs.createReadStream as jest.Mock).mockReturnValue(mockStream);
+
+			mockReq.headers.range = 'bytes=-500000';
+
+			await service.streamVideo('torrent-1', mockReq as any, mockRes as any);
+
+			expect(mockRes.writeHead).toHaveBeenCalledWith(206, expect.objectContaining({
+				'Content-Range': 'bytes 500000-999999/1000000',
+				'Content-Length': 500000,
+			}));
+		});
+
+		it('should return 416 for invalid range', async () => {
+			torrentService.startDownload.mockResolvedValue(mockStatus());
+			torrentService.getVideoFilePath.mockResolvedValue('/downloads/movie.mp4');
+			(fs.stat as jest.Mock).mockResolvedValue({ size: 1000000 });
+
+			mockReq.headers.range = 'bytes=9999999-';
+
+			await service.streamVideo('torrent-1', mockReq as any, mockRes as any);
+
+			expect(mockRes.writeHead).toHaveBeenCalledWith(416, {
+				'Accept-Ranges': 'bytes',
+				'Content-Range': 'bytes */1000000',
+			});
+			expect(mockRes.end).toHaveBeenCalledTimes(1);
 		});
 
 		it('should limit available bytes to downloadedBytes for incomplete torrents', async () => {

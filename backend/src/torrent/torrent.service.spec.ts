@@ -24,7 +24,12 @@ const makeTorrentRecord = (overrides = {}) => ({
 
 describe('TorrentService', () => {
 	let service: TorrentService;
-	let rpc: { addTorrent: jest.Mock; getTorrent: jest.Mock; removeTorrent: jest.Mock };
+	let rpc: {
+		addTorrent: jest.Mock;
+		getTorrent: jest.Mock;
+		removeTorrent: jest.Mock;
+		findTorrentIdByHash: jest.Mock;
+	};
 	let prisma: { torrent: { findUnique: jest.Mock; update: jest.Mock } };
 
 	beforeEach(async () => {
@@ -32,6 +37,7 @@ describe('TorrentService', () => {
 			addTorrent: jest.fn(),
 			getTorrent: jest.fn(),
 			removeTorrent: jest.fn(),
+			findTorrentIdByHash: jest.fn().mockResolvedValue(null),
 		};
 
 		prisma = {
@@ -99,13 +105,34 @@ describe('TorrentService', () => {
 				totalSize: 700000000,
 				haveValid: 525000000,
 				downloadDir: '/downloads',
-				files: [{ name: 'movie.mp4', length: 700000000, bytesCompleted: 525000000 }],
+				files: [{ name: 'movie.mp4', length: 700000000, bytesCompleted: 420000000 }],
 			});
 
 			const result = await service.startDownload('torrent-uuid-1');
 
 			expect(result.status).toBe(TorrentDownloadStatus.DOWNLOADING);
 			expect(result.progress).toBe(0.75);
+			expect(result.downloadedBytes).toBe(420000000);
+		});
+
+		it('should rebuild transmission id mapping by hash after restart', async () => {
+			prisma.torrent.findUnique.mockResolvedValue(makeTorrentRecord());
+			rpc.findTorrentIdByHash.mockResolvedValue(42);
+			rpc.getTorrent.mockResolvedValue({
+				id: 42,
+				percentDone: 0.2,
+				status: 4,
+				totalSize: 700000000,
+				haveValid: 140000000,
+				downloadDir: '/downloads',
+				files: [{ name: 'movie.mp4', length: 700000000, bytesCompleted: 120000000 }],
+			});
+
+			const result = await service.getStatus('torrent-uuid-1');
+
+			expect(rpc.findTorrentIdByHash).toHaveBeenCalledWith('abc123');
+			expect(result.status).toBe(TorrentDownloadStatus.DOWNLOADING);
+			expect(result.downloadedBytes).toBe(120000000);
 		});
 	});
 
