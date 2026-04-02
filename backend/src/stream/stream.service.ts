@@ -5,7 +5,6 @@ import { HlsManagerService } from './hls/hls-manager.service';
 import { stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { extname } from 'node:path';
-import { spawn } from 'node:child_process';
 import type { Request, Response } from 'express';
 
 /** MIME types for video containers that browsers can play natively */
@@ -83,8 +82,9 @@ export class StreamService {
 		const ext = extname(filePath).toLowerCase();
 
 		if (NEEDS_TRANSCODE.has(ext)) {
-			// Instead of waiting for complete, start HLS live transcoding pipeline
-			await this.serveHls(torrentId, filePath, fileSize, res);
+			// Use totalSize from torrent metadata (not fileSize which may be partial)
+			const totalBytes = status.totalSize ?? fileSize;
+			await this.serveHls(torrentId, filePath, totalBytes, res);
 			return;
 		}
 
@@ -131,60 +131,6 @@ export class StreamService {
 				error: error instanceof Error ? error.message : 'Unknown error',
 			});
 		}
-	}
-
-	/**
-	 * Repackage a non-browser-native file (MKV, AVI, etc.) into fragmented MP4 on the fly.
-	 *
-	 * Uses ffmpeg with `-c:v copy` (no video re-encoding, fast) and `-c:a aac`
-	 * (audio re-encode only if needed). The `-movflags frag_keyframe+empty_moov`
-	 * flag produces a fragmented MP4 that can be streamed without seeking to the end.
-	 *
-	 * Range requests are not supported for transcoded streams because the output
-	 * size is unknown. The browser will buffer progressively instead.
-	 */
-	private serveTranscoded(res: Response, filePath: string): void {
-		const ffmpegArgs = [
-			'-i', filePath,
-			'-c:v', 'copy',
-			'-c:a', 'aac',
-			'-f', 'mp4',
-			'-movflags', 'frag_keyframe+empty_moov',
-			'pipe:1',
-		];
-
-		const ffmpeg = spawn('ffmpeg', ffmpegArgs);
-
-		res.writeHead(200, {
-			'Content-Type': 'video/mp4',
-		});
-
-		ffmpeg.stdout.pipe(res);
-
-		ffmpeg.stderr.on('data', (data: Buffer) => {
-			this.logger.debug(`ffmpeg: ${data.toString().trim()}`);
-		});
-
-		ffmpeg.on('error', (err) => {
-			this.logger.error(`ffmpeg spawn error: ${err.message}`);
-			if (!res.headersSent) {
-				res.status(500).json({ message: 'Transcoding failed' });
-			}
-		});
-
-		ffmpeg.on('close', (code) => {
-			if (code && code !== 0) {
-				this.logger.error(`ffmpeg exited with code ${code}`);
-				res.destroy();
-			}
-		});
-
-		// Clean up ffmpeg if the client disconnects mid-stream
-		res.on('close', () => {
-			if (!ffmpeg.killed) {
-				ffmpeg.kill('SIGTERM');
-			}
-		});
 	}
 
 	/**

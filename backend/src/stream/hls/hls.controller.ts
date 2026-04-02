@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Res, UseGuards, StreamableFile } from '@nestjs/common';
+import { Controller, Get, Param, Res, UseGuards, NotFoundException } from '@nestjs/common';
 import { ApiOkResponse, ApiNotFoundResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
@@ -59,7 +59,7 @@ export class HlsController {
 	 */
 	@Get(':jobId/:segmentName')
 	@ApiOperation({ summary: 'Get HLS segment file' })
-	@ApiOkResponse({ type: StreamableFile, description: 'MPEG-TS segment' })
+	@ApiOkResponse({ description: 'MPEG-TS segment' })
 	@ApiNotFoundResponse({ description: 'Segment not found', type: ErrorResponseDto })
 	@ApiUnauthorizedResponse({ description: 'Authentication required', type: ErrorResponseDto })
 	async getSegment(
@@ -76,7 +76,7 @@ export class HlsController {
 
 		res.setHeader('Content-Type', 'video/mp2t');
 		res.setHeader('Cache-Control', 'public, max-age=3600');
-		return new StreamableFile(stream);
+		stream.pipe(res);
 	}
 
 	/**
@@ -105,7 +105,7 @@ export class HlsController {
 		const status = this.hlsManager.getJobStatus(jobId);
 
 		if (!status) {
-			return { error: `Job ${jobId} not found`, statusCode: 404 };
+			throw new NotFoundException(`Job ${jobId} not found`);
 		}
 
 		return status;

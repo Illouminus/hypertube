@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
-import { Readable } from 'node:stream';
+import { Readable, PassThrough } from 'node:stream';
 
 /**
  * Pump Reader: reads a growing file and outputs its contents as a stream.
@@ -27,24 +26,21 @@ export class PumpReaderService {
 	 * Create a readable stream that "pumps" data from a growing file.
 	 *
 	 * @param filePath          Path to the file being downloaded
+	 * @param totalBytes        Total expected file size (from torrent metadata)
 	 * @param getDownloadedBytes Callback to get current downloaded byte count
 	 * @param pollIntervalMs    How often to check for new data (default 500ms)
 	 * @returns                 Readable stream that ffmpeg can consume
 	 */
 	createGrowingFileStream(
 		filePath: string,
+		totalBytes: number,
 		getDownloadedBytes: () => Promise<number>,
 		pollIntervalMs: number = 500,
 	): Readable {
-		/**
-		 * PassThrough is a special stream that just passes data through.
-		 * We push data to it manually, and consumers read from it.
-		 */
-		const { PassThrough } = require('node:stream');
 		const outputStream = new PassThrough();
 
 		// Start the pump loop in background (non-blocking)
-		this.pumpFile(filePath, outputStream, getDownloadedBytes, pollIntervalMs).catch((err) => {
+		this.pumpFile(filePath, outputStream, totalBytes, getDownloadedBytes, pollIntervalMs).catch((err) => {
 			this.logger.error(`Pump reader error: ${err.message}`);
 			outputStream.destroy(err);
 		});
@@ -56,17 +52,17 @@ export class PumpReaderService {
 	 * Core pump loop: reads file in chunks as it grows.
 	 *
 	 * Algorithm:
-	 * 1. Read current state: file size on disk.
+	 * 1. Read current state: downloaded bytes count.
 	 * 2. Calculate how many new bytes are available since last read.
 	 * 3. If new bytes: read them and push to stream.
-	 * 4. If no new bytes but still downloading: wait and check again.
-	 * 5. If download complete (no new bytes after timeout): close stream.
-	 *
-	 * This ensures we're always feeding ffmpeg the latest data without gaps.
+	 * 4. If all bytes read (offset >= totalBytes): close stream.
+	 * 5. If no new bytes but still downloading: wait and check again.
+	 * 6. If download stalls (no new bytes after timeout): close stream.
 	 */
 	private async pumpFile(
 		filePath: string,
-		outputStream: any,
+		outputStream: PassThrough,
+		totalBytes: number,
 		getDownloadedBytes: () => Promise<number>,
 		pollIntervalMs: number,
 	): Promise<void> {
@@ -89,24 +85,26 @@ export class PumpReaderService {
 					offset += chunk.length;
 					lastActivityTime = Date.now();
 
-					this.logger.debug(
-						`Pump: read bytes ${offset - chunk.length}-${offset} (total downloaded: ${downloadedBytes})`,
-					);
+					// Check if we've read all expected bytes
+					if (offset >= totalBytes) {
+						this.logger.log(`Pump: all ${totalBytes} bytes read, closing stream`);
+						outputStream.push(null);
+						break;
+					}
 				} else {
 					// No new data yet. Check if we've been idle too long.
 					const stallDuration = Date.now() - lastActivityTime;
 					if (stallDuration > stallTimeoutMs) {
 						this.logger.warn(`Pump: download stalled for ${stallDuration}ms, assuming complete`);
-						outputStream.push(null); // Signal end of stream
+						outputStream.push(null);
 						break;
 					}
 
-					// Still downloading, wait and try again
 					await this.sleep(pollIntervalMs);
 				}
 			} catch (error) {
 				this.logger.error(`Pump: fatal error during pump loop: ${error}`);
-				outputStream.destroy(error);
+				outputStream.destroy(error instanceof Error ? error : new Error(String(error)));
 				break;
 			}
 		}
@@ -115,7 +113,7 @@ export class PumpReaderService {
 	/**
 	 * Read a specific chunk from a file.
 	 *
-	 * This is safe to call on a partially-downloaded file
+	 * Safe to call on a partially-downloaded file
 	 * (as long as the byte range is within downloaded bounds).
 	 */
 	private async readFileChunk(filePath: string, offset: number, length: number): Promise<Buffer> {
@@ -125,9 +123,9 @@ export class PumpReaderService {
 				end: offset + length - 1,
 			});
 
-			const chunks: (Buffer | string)[] = [];
-			stream.on('data', (chunk) => chunks.push(chunk));
-			stream.on('end', () => resolve(Buffer.concat(chunks.map((c) => (typeof c === 'string' ? Buffer.from(c) : c)))));
+			const chunks: Buffer[] = [];
+			stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+			stream.on('end', () => resolve(Buffer.concat(chunks)));
 			stream.on('error', reject);
 		});
 	}

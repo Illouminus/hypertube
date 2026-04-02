@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { spawn, ChildProcess } from 'node:child_process';
+import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { TorrentService } from 'src/torrent/torrent.service';
 import { PumpReaderService } from './pump-reader.service';
@@ -22,6 +22,9 @@ export class HlsManagerService {
 
 	/** Map of all active jobs: jobId -> HlsJob */
 	private readonly jobs = new Map<string, HlsJob>();
+
+	/** Active ffmpeg processes for cleanup on shutdown */
+	private readonly ffmpegProcesses = new Map<string, ChildProcess>();
 
 	/** ffmpeg output directory (configure from ENV) */
 	private readonly hlsOutputDir = './hls-temp';
@@ -63,7 +66,7 @@ export class HlsManagerService {
 		const finalConfig: HlsJobConfig = {
 			prebufferBytes: 32 * 1024 * 1024, // 32 MB
 			segmentDuration: 3,
-			playlistSize: 10,
+			playlistSize: 0, // 0 = keep all segments (VOD-style, allows seeking)
 			pollIntervalMs: 500,
 			stallTimeoutSec: 30,
 			videoBitrate: 'copy',
@@ -112,14 +115,9 @@ export class HlsManagerService {
 		}
 
 		let progress = 0;
-		if (job.totalBytes) {
+		if (job.totalBytes && job.totalBytes > 0) {
 			progress = Math.min(job.bytesTranscoded / job.totalBytes, 1);
 		}
-
-		const estimatedRemaining =
-			job.status === HlsJobStatus.TRANSCODING && job.totalBytes
-				? Math.max(0, (job.totalBytes - job.bytesTranscoded) / (1024 * 1024) * 5)
-				: null;
 
 		return {
 			jobId: job.jobId,
@@ -127,9 +125,39 @@ export class HlsManagerService {
 			progress,
 			segmentsAvailable: job.segmentsGenerated,
 			playlistUrl: job.status !== HlsJobStatus.PREBUFFERING ? `/stream/hls/${job.jobId}/playlist.m3u8` : null,
-			estimatedTimeRemaining: estimatedRemaining,
+			estimatedTimeRemaining: null,
 			errorMessage: job.errorMessage,
 		};
+	}
+
+	/**
+	 * Check if a job is completed (used by segment service to add ENDLIST).
+	 */
+	isJobCompleted(jobId: string): boolean {
+		const job = this.jobs.get(jobId);
+		return job?.status === HlsJobStatus.COMPLETED;
+	}
+
+	/**
+	 * Clean up a job: kill ffmpeg, delete segments from disk, remove from map.
+	 */
+	async cleanupJob(jobId: string): Promise<void> {
+		const ffmpeg = this.ffmpegProcesses.get(jobId);
+		if (ffmpeg && !ffmpeg.killed) {
+			ffmpeg.kill('SIGTERM');
+		}
+		this.ffmpegProcesses.delete(jobId);
+
+		const job = this.jobs.get(jobId);
+		if (job) {
+			try {
+				await rm(job.outputDir, { recursive: true, force: true });
+			} catch (err) {
+				this.logger.warn(`Failed to clean up HLS dir for ${jobId}: ${err}`);
+			}
+		}
+		this.jobs.delete(jobId);
+		this.logger.log(`Cleaned up HLS job ${jobId}`);
 	}
 
 	/**
@@ -167,9 +195,8 @@ export class HlsManagerService {
 	/**
 	 * Start ffmpeg transcoding with pump reader.
 	 *
-	 * This is where the magic happens:
 	 * 1. Create HLS output directory.
-	 * 2. Create pump reader stream (ready to feed new data).
+	 * 2. Create pump reader stream (feeds growing file data).
 	 * 3. Start ffmpeg with pump reader connected to stdin.
 	 * 4. Monitor ffmpeg process and segment generation.
 	 */
@@ -185,6 +212,7 @@ export class HlsManagerService {
 		// Create pump reader that will feed data to ffmpeg
 		const inputStream = this.pumpReader.createGrowingFileStream(
 			job.inputFilePath,
+			job.totalBytes ?? 0,
 			() => this.torrentService.getDownloadedBytes(torrentId),
 			job.config.pollIntervalMs,
 		);
@@ -197,23 +225,30 @@ export class HlsManagerService {
 
 		// Spawn ffmpeg process
 		const ffmpeg = spawn('ffmpeg', ffmpegArgs, {
-			stdio: ['pipe', 'pipe', 'pipe'], // stdin, stdout, stderr
+			stdio: ['pipe', 'pipe', 'pipe'],
 		});
 
 		job.ffmpegPid = ffmpeg.pid ?? null;
+		this.ffmpegProcesses.set(jobId, ffmpeg);
 
 		// Connect pump reader to ffmpeg stdin
 		inputStream.pipe(ffmpeg.stdin);
 
-		// Monitor ffmpeg output for segment generation
-		ffmpeg.stderr.on('data', (data) => {
+		// Monitor ffmpeg output for segment generation and progress
+		ffmpeg.stderr.on('data', (data: Buffer) => {
 			const line = data.toString();
 			this.logger.debug(`ffmpeg: ${line.trim()}`);
 
-			// Parse segment info from ffmpeg output
+			// Track segment creation
 			if (line.includes('Opening') && line.includes('.ts')) {
 				job.segmentsGenerated++;
 				job.lastProgressAt = new Date();
+			}
+
+			// Track bytes processed from ffmpeg progress output (e.g. "size=   12345kB")
+			const sizeMatch = line.match(/size=\s*(\d+)kB/);
+			if (sizeMatch) {
+				job.bytesTranscoded = parseInt(sizeMatch[1], 10) * 1024;
 			}
 		});
 
@@ -222,12 +257,12 @@ export class HlsManagerService {
 			this.logger.error(`ffmpeg error for ${jobId}: ${err.message}`);
 			job.status = HlsJobStatus.FAILED;
 			job.errorMessage = `ffmpeg crashed: ${err.message}`;
+			this.ffmpegProcesses.delete(jobId);
 		});
 
 		// Handle ffmpeg exit
 		ffmpeg.on('close', (code) => {
 			if (code === 0 || code === null) {
-				// code=null when killed by signal (expected on normal completion)
 				job.status = HlsJobStatus.COMPLETED;
 				this.logger.log(`Job ${jobId}: ffmpeg completed successfully`);
 			} else {
@@ -236,6 +271,7 @@ export class HlsManagerService {
 				this.logger.error(`Job ${jobId}: ffmpeg exited with code ${code}`);
 			}
 			job.ffmpegPid = null;
+			this.ffmpegProcesses.delete(jobId);
 		});
 	}
 
@@ -247,7 +283,7 @@ export class HlsManagerService {
 	 * - `-c:v copy`: copy video codec (no re-encode, fast)
 	 * - `-c:a aac`: transcode audio to AAC (browser friendly)
 	 * - `-hls_time 3`: 3-second segments
-	 * - `-hls_list_size 10`: keep 10 segments in playlist
+	 * - `-hls_list_size 0`: keep all segments in playlist (allows seeking)
 	 * - `-f hls`: output format is HLS
 	 */
 	private buildFfmpegArgs(hlsOutput: string, config: HlsJobConfig): string[] {
@@ -255,16 +291,16 @@ export class HlsManagerService {
 		const videoOptions = config.videoBitrate === 'copy' ? [] : ['-preset', 'veryfast'];
 
 		return [
-			'-i', 'pipe:0', // Read from stdin (pump reader)
-			'-c:v', videoCodec, // Video codec
+			'-i', 'pipe:0',
+			'-c:v', videoCodec,
 			...videoOptions,
-			'-c:a', config.audioCodec, // Audio codec
-			'-b:a', '128k', // Audio bitrate
-			'-f', 'hls', // Output format
+			'-c:a', config.audioCodec,
+			'-b:a', '128k',
+			'-f', 'hls',
 			'-hls_time', String(config.segmentDuration),
 			'-hls_list_size', String(config.playlistSize),
-			'-hls_flags', 'append_list+live', // Append to playlist, live mode
-			hlsOutput, // Output pattern
+			'-hls_flags', 'append_list',
+			hlsOutput,
 		];
 	}
 

@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createReadStream, existsSync } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
+import { HlsManagerService } from './hls-manager.service';
 
 /**
  * HLS Segment Service manages reading and serving HLS segments and playlists.
@@ -18,22 +19,14 @@ export class HlsSegmentService {
 
 	private readonly hlsOutputDir = './hls-temp';
 
+	constructor(private readonly hlsManager: HlsManagerService) {}
+
 	/**
 	 * Generate M3U8 playlist for a job.
 	 *
 	 * The playlist references all available segments and includes metadata
-	 * like segment duration and target duration.
-	 *
-	 * Format:
-	 * #EXTM3U
-	 * #EXT-X-VERSION:3
-	 * #EXT-X-TARGETDURATION:3
-	 * #EXT-X-MEDIA-SEQUENCE:0
-	 * #EXTINF:3.0,
-	 * out-0.ts
-	 * #EXTINF:3.0,
-	 * out-1.ts
-	 * ...
+	 * like segment duration and target duration. When the job is completed,
+	 * #EXT-X-ENDLIST is appended so the player stops polling.
 	 *
 	 * @param jobId Job ID
 	 * @returns     M3U8 content or null if job not found
@@ -42,39 +35,36 @@ export class HlsSegmentService {
 		const jobDir = join(this.hlsOutputDir, jobId);
 
 		try {
-			// List all segment files in the job directory
 			const files = await readdir(jobDir);
 			const segments = files
 				.filter((f) => f.endsWith('.ts'))
 				.sort((a, b) => {
-					// Sort by segment number: out-0.ts, out-1.ts, ...
 					const numA = parseInt(a.match(/\d+/)![0], 10);
 					const numB = parseInt(b.match(/\d+/)![0], 10);
 					return numA - numB;
 				});
 
 			if (segments.length === 0) {
-				// Job exists but no segments yet
 				this.logger.debug(`Playlist for ${jobId}: no segments yet`);
 				return this.generateEmptyPlaylist();
 			}
 
-			// Build playlist with all segments
 			const lines = [
 				'#EXTM3U',
 				'#EXT-X-VERSION:3',
-				'#EXT-X-TARGETDURATION:4', // 1 second buffer
-				`#EXT-X-MEDIA-SEQUENCE:0`,
+				'#EXT-X-TARGETDURATION:4',
+				'#EXT-X-MEDIA-SEQUENCE:0',
 			];
 
 			for (const segment of segments) {
-				lines.push('#EXTINF:3.0,'); // 3-second segment duration
+				lines.push('#EXTINF:3.0,');
 				lines.push(segment);
 			}
 
-			// Only add END tag if we know it's complete
-			// (Client should check job status to know if it's done)
-			// For now, we don't add it so player knows to keep polling
+			// Add ENDLIST when transcoding is complete so player stops polling
+			if (this.hlsManager.isJobCompleted(jobId)) {
+				lines.push('#EXT-X-ENDLIST');
+			}
 
 			return lines.join('\n') + '\n';
 		} catch (error) {
@@ -91,13 +81,13 @@ export class HlsSegmentService {
 	 * @returns           Readable stream or null if not found
 	 */
 	async getSegmentStream(jobId: string, segmentName: string): Promise<Readable | null> {
-		const segmentPath = join(this.hlsOutputDir, jobId, segmentName);
-
-		// Security: ensure segmentName doesn't escape the job directory
-		if (!segmentPath.startsWith(join(this.hlsOutputDir, jobId))) {
-			this.logger.warn(`Security: attempt to access path outside job dir: ${segmentPath}`);
+		// Security: reject any path traversal attempts
+		if (segmentName.includes('..') || segmentName.includes('/') || segmentName.includes('\\')) {
+			this.logger.warn(`Security: rejected segment name with path traversal: ${segmentName}`);
 			return null;
 		}
+
+		const segmentPath = join(this.hlsOutputDir, jobId, segmentName);
 
 		if (!existsSync(segmentPath)) {
 			this.logger.warn(`Segment not found: ${segmentPath}`);
@@ -112,9 +102,7 @@ export class HlsSegmentService {
 		}
 	}
 
-	/**
-	 * Generate an empty playlist for jobs that just started prebuffering.
-	 */
+	/** Generate an empty playlist for jobs that just started prebuffering */
 	private generateEmptyPlaylist(): string {
 		return (
 			[
@@ -122,7 +110,6 @@ export class HlsSegmentService {
 				'#EXT-X-VERSION:3',
 				'#EXT-X-TARGETDURATION:4',
 				'#EXT-X-MEDIA-SEQUENCE:0',
-				'# Waiting for first segment...',
 			].join('\n') + '\n'
 		);
 	}
