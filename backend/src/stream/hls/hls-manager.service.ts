@@ -63,9 +63,15 @@ export class HlsManagerService implements OnModuleDestroy {
 		const jobId = `hls-${torrentId}`;
 
 		// Check if job already exists
-		if (this.jobs.has(jobId)) {
-			this.logger.warn(`Job ${jobId} already exists, returning existing`);
-			return jobId;
+		const existingJob = this.jobs.get(jobId);
+		if (existingJob) {
+			if (existingJob.status === HlsJobStatus.FAILED) {
+				this.logger.warn(`Job ${jobId} is failed, recreating`);
+				await this.cleanupJob(jobId);
+			} else {
+				this.logger.warn(`Job ${jobId} already exists, returning existing`);
+				return jobId;
+			}
 		}
 
 		// Merge config with defaults
